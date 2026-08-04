@@ -11,12 +11,19 @@
 </script>
 
 {#if href}
-  <a {href} class={`ui-button ui-button--${variant} ui-button--${size} ${className}`} {...rest}>
+  <a
+    {href}
+    class={`ui-button ui-button--${variant}${size === 'default' ? '' : ` ui-button--${size}`} ${className}`}
+    {...rest}
+  >
     {@render children?.()}
   </a>
 {:else}
-  <button {type} class={`ui-button ui-button--${variant} ui-button--${size} ${className}`} {...rest}>
+  <button
+    {type}
+    class={`ui-button ui-button--${variant}${size === 'default' ? '' : ` ui-button--${size}`} ${className}`}
+    {...rest}
+  >
     {@render children?.()}
   </button>
 {/if}
-

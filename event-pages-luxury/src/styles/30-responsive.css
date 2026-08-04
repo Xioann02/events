@@ -1,0 +1,693 @@
+/* Tablet */
+@media (max-width: 1100px) {
+  .hero-scene {
+    min-height: 720px;
+  }
+
+  .stationery-backdrop {
+    width: 47%;
+  }
+
+  .envelope-stage {
+    left: 2%;
+    width: 67%;
+  }
+
+  .hero-photo {
+    right: 0;
+    width: 38%;
+  }
+
+  .date-medallion {
+    right: 28%;
+  }
+
+  .countdown-block {
+    grid-template-columns: 1fr auto;
+  }
+
+  .countdown-block > .eyebrow {
+    grid-column: 1 / -1;
+  }
+
+  .countdown-grid {
+    max-width: 670px;
+  }
+
+  .timeline-content {
+    grid-template-columns: minmax(180px, 1fr) minmax(150px, 0.8fr);
+  }
+
+  .timeline-content .ui-button {
+    grid-column: 1 / -1;
+    width: fit-content;
+  }
+
+  .rsvp-layout {
+    grid-template-columns: minmax(250px, 0.7fr) minmax(470px, 1.3fr);
+    gap: 48px;
+  }
+}
+
+@media (max-width: 900px) {
+  .section-shell,
+  .hero-shell {
+    width: min(100% - 36px, var(--shell));
+  }
+
+  .hero-scene {
+    min-height: 770px;
+  }
+
+  .stationery-backdrop {
+    width: 55%;
+    height: 65%;
+  }
+
+  .envelope-stage {
+    top: 33%;
+    left: -1%;
+    width: 74%;
+  }
+
+  .invitation-card h1 {
+    font-size: clamp(4rem, 9.6vw, 6rem);
+  }
+
+  .hero-photo {
+    top: 13%;
+    width: 40%;
+  }
+
+  .pearl-chain {
+    top: 8%;
+    right: 26%;
+    transform: scale(0.86) rotate(24deg);
+  }
+
+  .date-medallion {
+    right: 27%;
+    bottom: 1%;
+  }
+
+  .countdown-block {
+    margin-top: 4px;
+  }
+
+  .section-header--split {
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 25px;
+  }
+
+  .timeline-section > .section-shell {
+    padding: 54px 42px;
+  }
+
+  .timeline-list::before {
+    left: 128px;
+  }
+
+  .timeline-item {
+    grid-template-columns: 98px 60px minmax(0, 1fr);
+  }
+
+  .timeline-content {
+    grid-template-columns: 1fr;
+    gap: 7px;
+    padding: 12px 0;
+  }
+
+  .timeline-content .ui-button {
+    margin-top: 9px;
+  }
+
+  .rsvp-layout {
+    grid-template-columns: 1fr;
+    gap: 64px;
+  }
+
+  .rsvp-intro {
+    position: static;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 0.72fr);
+    align-items: end;
+    gap: 35px;
+    padding-top: 0;
+  }
+
+  .rsvp-intro > .eyebrow,
+  .rsvp-intro > h2,
+  .rsvp-intro > .rsvp-deadline {
+    grid-column: 1;
+  }
+
+  .rsvp-intro > h2 {
+    margin-top: -15px;
+  }
+
+  .contact-card {
+    grid-column: 2;
+    grid-row: 1 / 4;
+    margin-top: 0;
+  }
+}
+
+/* Mobile stationery */
+@media (max-width: 720px) {
+  :root {
+    --section-y: 92px;
+    --radius-panel: 25px;
+  }
+
+  .section-shell,
+  .hero-shell {
+    width: min(100% - 28px, var(--shell));
+  }
+
+  .luxury-brand,
+  .language-switch {
+    top: 16px;
+  }
+
+  .luxury-brand {
+    left: 16px;
+    min-height: 48px;
+    gap: 12px;
+    padding: 6px 14px;
+  }
+
+  .luxury-brand small {
+    padding-left: 12px;
+  }
+
+  .language-switch {
+    right: 16px;
+    min-height: 48px;
+    padding: 4px;
+  }
+
+  .language-switch button {
+    width: 38px;
+    min-height: 38px;
+  }
+
+  .hero-section {
+    padding: 88px 0 52px;
+  }
+
+  .hero-scene {
+    --card-rise: -39%;
+    min-height: 780px;
+  }
+
+  .stationery-backdrop {
+    top: 0;
+    left: 4%;
+    width: 76%;
+    height: 57%;
+    padding: 46px 24px;
+    border-radius: 24px;
+  }
+
+  .stationery-backdrop small {
+    font-size: 0.47rem;
+  }
+
+  .envelope-stage {
+    top: 31%;
+    left: -5%;
+    width: 94%;
+  }
+
+  .invitation-card {
+    padding: 30px;
+    border-radius: 19px;
+  }
+
+  .invitation-card__label {
+    max-width: 190px;
+    margin-bottom: 22px;
+  }
+
+  .invitation-card h1 {
+    max-width: 91%;
+    font-size: clamp(3.7rem, 14vw, 5.4rem);
+  }
+
+  .invitation-card h1 i {
+    right: 0;
+  }
+
+  .hero-date {
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 27px;
+    font-size: 0.6rem;
+  }
+
+  .hero-date i {
+    width: 18px;
+  }
+
+  .wax-seal {
+    top: 17px;
+    right: 17px;
+    width: 56px;
+  }
+
+  .hero-photo {
+    top: 48%;
+    right: 1%;
+    width: 45%;
+    padding: 8px 8px 37px;
+    border-radius: 10px;
+  }
+
+  .hero-photo img {
+    border-radius: 5px;
+  }
+
+  .hero-photo figcaption {
+    right: 11px;
+    bottom: 12px;
+    left: 11px;
+  }
+
+  .hero-photo figcaption span:last-child {
+    display: none;
+  }
+
+  .photo-pearl {
+    top: -9px;
+    width: 23px;
+  }
+
+  .date-medallion {
+    right: auto;
+    bottom: 2%;
+    left: 3%;
+    width: 126px;
+  }
+
+  .pearl-chain {
+    top: 9%;
+    right: -5%;
+    transform: scale(0.72) rotate(28deg);
+  }
+
+  .pearl-chain i:nth-child(n + 9) {
+    display: none;
+  }
+
+  .confetti--one {
+    top: 7%;
+    left: 1%;
+  }
+
+  .confetti--two {
+    top: 12%;
+    right: 13%;
+  }
+
+  .confetti--three {
+    display: none;
+  }
+
+  .countdown-block {
+    grid-template-columns: 1fr;
+    gap: 22px;
+    padding: 26px 22px;
+  }
+
+  .countdown-block > .eyebrow {
+    grid-column: auto;
+    text-align: center;
+  }
+
+  .countdown-grid {
+    width: 100%;
+  }
+
+  .countdown-block .ui-button {
+    width: 100%;
+  }
+
+  .invitation-copy {
+    padding: 68px 28px;
+  }
+
+  .invitation-copy::before {
+    inset: -10px 12px 10px -10px;
+  }
+
+  .parents-list {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .parents-list i {
+    justify-self: center;
+  }
+
+  .timeline-section > .section-shell {
+    width: min(100% - 28px, var(--shell));
+    padding: 50px 28px;
+  }
+
+  .timeline-list::before {
+    left: 109px;
+  }
+
+  .timeline-item {
+    grid-template-columns: 82px 54px minmax(0, 1fr);
+    min-height: 174px;
+  }
+
+  .timeline-time {
+    font-size: 1.75rem;
+  }
+
+  .rsvp-intro {
+    display: block;
+  }
+
+  .rsvp-intro > h2 {
+    margin-top: 0;
+  }
+
+  .contact-card {
+    margin-top: 46px;
+  }
+
+  .rsvp-card {
+    padding: 32px 24px;
+    border-radius: 24px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .faq-heading {
+    padding-inline: 12px;
+  }
+
+  .accordion-list::before {
+    inset: 14px -7px -14px 8px;
+  }
+
+  .accordion-list > div:nth-child(n) {
+    transform: none;
+  }
+
+  .accordion-item summary {
+    min-height: 76px;
+    padding: 18px 20px 18px 55px;
+  }
+
+  .accordion-item summary::before {
+    left: 19px;
+    width: 19px;
+  }
+
+  .accordion-content__inner {
+    padding: 0 24px 24px 55px;
+  }
+
+  .slideshow-frame {
+    padding: 9px 9px 58px;
+    border-radius: 17px;
+  }
+
+  .slideshow-frame > img,
+  .slideshow-frame > video {
+    aspect-ratio: 4 / 3;
+    border-radius: 8px;
+  }
+
+  .slideshow::before,
+  .slideshow::after {
+    border-radius: 18px;
+  }
+
+  .slide-counter {
+    right: 16px;
+    bottom: 23px;
+  }
+
+  .upload-zone {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 18px;
+    padding: 32px 26px;
+  }
+
+  .upload-zone .ui-button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .upload-hint,
+  .upload-message,
+  .moderation-note {
+    grid-column: 1 / -1;
+    margin-top: -7px;
+    text-align: center;
+  }
+}
+
+@media (max-width: 520px) {
+  h2 {
+    font-size: clamp(3rem, 14vw, 4.4rem);
+  }
+
+  .luxury-brand small {
+    display: none;
+  }
+
+  .luxury-brand {
+    width: 54px;
+    justify-content: center;
+    padding: 6px;
+  }
+
+  .hero-scene {
+    min-height: 700px;
+  }
+
+  .stationery-backdrop {
+    left: 5%;
+    width: 84%;
+    height: 58%;
+  }
+
+  .backdrop-monogram {
+    font-size: 4.1rem;
+  }
+
+  .envelope-stage {
+    top: 34%;
+    left: -9%;
+    width: 108%;
+  }
+
+  .invitation-card {
+    left: 9%;
+    width: 82%;
+    padding: 24px;
+  }
+
+  .invitation-card__label {
+    max-width: 150px;
+    margin-bottom: 18px;
+    font-size: 0.47rem;
+  }
+
+  .invitation-card h1 {
+    font-size: clamp(3rem, 15vw, 4.25rem);
+    line-height: 0.75;
+  }
+
+  .hero-date {
+    max-width: 230px;
+    margin-top: 22px;
+    font-size: 0.52rem;
+  }
+
+  .wax-seal {
+    top: 14px;
+    right: 14px;
+    width: 49px;
+    font-size: 0.66rem;
+  }
+
+  .hero-photo {
+    top: 53%;
+    right: 1%;
+    width: 46%;
+  }
+
+  .date-medallion {
+    bottom: 0;
+    left: 2%;
+    width: 108px;
+  }
+
+  .date-medallion strong {
+    font-size: 3.2rem;
+  }
+
+  .pearl-chain {
+    top: 8%;
+    right: -15%;
+    transform: scale(0.6) rotate(29deg);
+  }
+
+  .countdown-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .countdown-unit {
+    padding: 16px 8px;
+  }
+
+  .countdown-unit:nth-child(3) {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .countdown-unit:nth-child(4) {
+    border-top: 1px solid var(--line);
+  }
+
+  .timeline-list::before {
+    display: none;
+  }
+
+  .timeline-item {
+    grid-template-columns: 1fr auto;
+    min-height: 0;
+    gap: 14px;
+    padding: 31px 0;
+  }
+
+  .timeline-time {
+    grid-column: 1;
+  }
+
+  .timeline-marker {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .timeline-content {
+    grid-column: 1 / -1;
+    padding: 4px 0 0;
+  }
+
+  .attendance-group {
+    grid-template-columns: 1fr;
+    border-radius: 19px;
+  }
+
+  .attendance-group label {
+    min-height: 46px;
+  }
+
+  .contact-card {
+    grid-template-columns: 40px minmax(0, 1fr);
+    padding: 22px;
+  }
+
+  .contact-icon {
+    width: 40px;
+  }
+
+  .upload-zone {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .upload-zone .ui-button,
+  .upload-hint,
+  .upload-message,
+  .moderation-note {
+    grid-column: 1;
+  }
+
+  footer {
+    min-height: 340px;
+  }
+}
+
+@media (max-width: 360px) {
+  .section-shell,
+  .hero-shell {
+    width: calc(100% - 24px);
+  }
+
+  .language-switch {
+    right: 12px;
+  }
+
+  .luxury-brand {
+    left: 12px;
+  }
+
+  .hero-scene {
+    min-height: 660px;
+  }
+
+  .stationery-backdrop {
+    left: 6%;
+    width: 86%;
+    height: 55%;
+  }
+
+  .envelope-stage {
+    top: 35%;
+  }
+
+  .invitation-card h1 {
+    font-size: 2.75rem;
+  }
+
+  .hero-photo {
+    top: 54%;
+  }
+
+  .date-medallion {
+    width: 96px;
+  }
+
+  .date-medallion span,
+  .date-medallion small {
+    font-size: 0.4rem;
+  }
+
+  .date-medallion strong {
+    font-size: 2.85rem;
+  }
+
+  .timeline-section > .section-shell {
+    width: calc(100% - 24px);
+    padding-inline: 23px;
+  }
+
+  .rsvp-card {
+    padding-inline: 20px;
+  }
+
+  .accordion-item summary {
+    padding-right: 16px;
+  }
+
+  .accordion-content__inner {
+    padding-right: 20px;
+  }
+}
+

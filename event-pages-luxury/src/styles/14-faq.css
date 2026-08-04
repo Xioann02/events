@@ -1,0 +1,143 @@
+/* FAQ paper folio */
+.faq-section {
+  position: relative;
+  padding: var(--section-y) 0;
+  background: var(--canvas-deep);
+}
+
+.faq-layout {
+  max-width: 1010px;
+}
+
+.faq-heading {
+  position: relative;
+  z-index: 2;
+  padding: 0 42px 48px;
+  text-align: center;
+}
+
+.faq-heading .eyebrow {
+  margin-bottom: 21px;
+}
+
+.accordion-list {
+  position: relative;
+  display: grid;
+  gap: 12px;
+}
+
+.accordion-list::before {
+  position: absolute;
+  inset: 18px -18px -18px 22px;
+  border: 1px solid rgba(29, 29, 27, 0.06);
+  border-radius: var(--radius-panel);
+  background: var(--stone);
+  box-shadow: 0 24px 50px rgba(45, 39, 35, 0.09);
+  content: '';
+  transform: rotate(0.8deg);
+}
+
+.accordion-list > div {
+  position: relative;
+  z-index: 1;
+}
+
+.accordion-list > div:nth-child(2) {
+  transform: translateX(8px);
+}
+
+.accordion-list > div:nth-child(3) {
+  transform: translateX(16px);
+}
+
+.accordion-list > div:nth-child(4) {
+  transform: translateX(24px);
+}
+
+.accordion-item {
+  overflow: hidden;
+  border: 1px solid rgba(29, 29, 27, 0.09);
+  border-radius: 20px;
+  background: var(--paper);
+  box-shadow: 0 10px 24px rgba(45, 39, 35, 0.06);
+  transition:
+    box-shadow 260ms ease,
+    transform 260ms var(--ease);
+}
+
+.accordion-item[open] {
+  box-shadow: 0 18px 42px rgba(45, 39, 35, 0.11);
+}
+
+.accordion-item summary {
+  position: relative;
+  display: flex;
+  min-height: 82px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+  padding: 20px 28px 20px 66px;
+  font-family: var(--display);
+  font-size: clamp(1.25rem, 2vw, 1.65rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  list-style: none;
+  cursor: pointer;
+}
+
+.accordion-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.accordion-item summary::before {
+  position: absolute;
+  left: 25px;
+  width: 21px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--pearl-gradient);
+  box-shadow:
+    0 7px 10px rgba(46, 40, 36, 0.17),
+    inset -2px -3px 5px rgba(83, 76, 69, 0.14);
+  content: '';
+}
+
+.accordion-item summary:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -5px;
+  border-radius: 18px;
+}
+
+.accordion-icon {
+  display: grid;
+  width: 38px;
+  flex: 0 0 38px;
+  aspect-ratio: 1;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  place-items: center;
+}
+
+.accordion-icon svg {
+  width: 17px;
+  stroke: var(--ink);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  transition: transform 320ms var(--ease);
+}
+
+.accordion-item[open] .accordion-icon svg {
+  transform: rotate(45deg);
+}
+
+.accordion-content__inner {
+  padding: 0 76px 27px 66px;
+}
+
+.accordion-content p {
+  max-width: 760px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.75;
+}

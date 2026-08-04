@@ -1,0 +1,49 @@
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .scroll-reveal {
+    opacity: 1;
+    transform: none;
+  }
+
+  .stationery-backdrop {
+    opacity: 1;
+    transform: rotate(-1.7deg) translateZ(-24px);
+  }
+
+  .envelope-flap {
+    transform: rotateX(-178deg);
+  }
+
+  .invitation-card {
+    opacity: 1;
+    transform: translateY(var(--card-rise)) translateZ(32px) rotateZ(0.6deg);
+  }
+
+  .hero-photo {
+    opacity: 1;
+    transform: translateZ(62px) rotate(2.2deg);
+  }
+
+  .date-medallion {
+    opacity: 1;
+    transform: rotate(-6deg) translateZ(82px);
+  }
+
+  .pearl-chain,
+  .confetti,
+  .countdown-block {
+    opacity: 1;
+  }
+}
