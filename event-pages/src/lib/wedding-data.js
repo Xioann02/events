@@ -1,13 +1,4 @@
-export const WEDDING_DATE = '2026-09-19T17:00:00+03:00'
-
-export const mapLinks = {
-  bride: 'https://www.google.com/maps/search/?api=1&query=Strovolos%2C+Cyprus',
-  groom: 'https://www.google.com/maps/search/?api=1&query=Engomi%2C+Cyprus',
-  church:
-    'https://www.google.com/maps/search/?api=1&query=Panagia+Chryseleousa+Church%2C+Strovolos%2C+Cyprus',
-  venue:
-    'https://www.google.com/maps/search/?api=1&query=Aelia+Wellness+Retreat%2C+Analiontas%2C+Cyprus',
-}
+import { MAP_LINKS } from './wedding-config.js'
 
 export const translations = {
   en: {
@@ -29,6 +20,7 @@ export const translations = {
     invitationTitle: 'We would love for you to be there.',
     invitationText:
       'With full hearts, we invite you to celebrate the beginning of our life together. Having you beside us will make this day even more meaningful.',
+    parentsTitle: 'Our parents',
     brideParentsLabel: 'Parents of the bride',
     brideParents: 'George & Maria Nicolaou',
     groomParentsLabel: 'Parents of the groom',
@@ -43,28 +35,28 @@ export const translations = {
         title: 'Bride’s preparations',
         place: 'Eleni’s family home',
         address: 'Strovolos, Nicosia',
-        map: mapLinks.bride,
+        map: MAP_LINKS.bride,
       },
       {
         time: '2:30 PM',
         title: 'Groom’s preparations',
         place: 'Andreas’s family home',
         address: 'Engomi, Nicosia',
-        map: mapLinks.groom,
+        map: MAP_LINKS.groom,
       },
       {
         time: '5:00 PM',
         title: 'Wedding ceremony',
         place: 'Panagia Chryseleousa Church',
         address: 'Strovolos, Nicosia',
-        map: mapLinks.church,
+        map: MAP_LINKS.church,
       },
       {
         time: '7:00 PM',
         title: 'Reception · dinner & drinks',
         place: 'Aelia Wellness Retreat',
         address: 'Analiontas, Nicosia',
-        map: mapLinks.venue,
+        map: MAP_LINKS.venue,
       },
     ],
     rsvpEyebrow: 'Kindly reply',
@@ -158,6 +150,7 @@ export const translations = {
     invitationTitle: 'Θα χαρούμε πολύ να είστε μαζί μας.',
     invitationText:
       'Με τις καρδιές μας γεμάτες χαρά, σας προσκαλούμε να γιορτάσετε μαζί μας την αρχή της κοινής μας ζωής. Η παρουσία σας θα κάνει αυτή τη μέρα ακόμη πιο ξεχωριστή.',
+    parentsTitle: 'Οι γονείς μας',
     brideParentsLabel: 'Γονείς της νύφης',
     brideParents: 'Γιώργος & Μαρία Νικολάου',
     groomParentsLabel: 'Γονείς του γαμπρού',
@@ -172,28 +165,28 @@ export const translations = {
         title: 'Αλλάματα νύφης',
         place: 'Το πατρικό της Ελένης',
         address: 'Στρόβολος, Λευκωσία',
-        map: mapLinks.bride,
+        map: MAP_LINKS.bride,
       },
       {
         time: '14:30',
         title: 'Αλλάματα γαμπρού',
         place: 'Το πατρικό του Ανδρέα',
         address: 'Έγκωμη, Λευκωσία',
-        map: mapLinks.groom,
+        map: MAP_LINKS.groom,
       },
       {
         time: '17:00',
         title: 'Μυστήριο γάμου',
         place: 'Ιερός Ναός Παναγίας Χρυσελεούσας',
         address: 'Στρόβολος, Λευκωσία',
-        map: mapLinks.church,
+        map: MAP_LINKS.church,
       },
       {
         time: '19:00',
         title: 'Δεξίωση · φαγητό & ποτό',
         place: 'Aelia Wellness Retreat',
         address: 'Αναλιόντας, Λευκωσία',
-        map: mapLinks.venue,
+        map: MAP_LINKS.venue,
       },
     ],
     rsvpEyebrow: 'Παρακαλούμε απαντήστε',

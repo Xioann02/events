@@ -1,12 +1,14 @@
 <script>
+  import { WEDDING_DISPLAY } from '../../wedding-config.js'
+
   let { copy, language, onLanguageChange } = $props()
 </script>
 
 <a class="skip-link" href="#main-content">{copy.skip}</a>
 
 <a class="luxury-brand" href="#main-content" aria-label={copy.names}>
-  <span>A <i>&</i> E</span>
-  <small>CYPRUS · 19.09.26</small>
+  <span>{WEDDING_DISPLAY.initials[0]} <i>&</i> {WEDDING_DISPLAY.initials[1]}</span>
+  <small>{WEDDING_DISPLAY.country} · {WEDDING_DISPLAY.shortDate}</small>
 </a>
 
 <div class="language-switch" role="group" aria-label={copy.language}>

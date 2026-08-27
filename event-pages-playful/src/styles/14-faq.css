@@ -1,0 +1,144 @@
+/* FAQ file cards */
+.faq-section {
+  padding: var(--section-y) 0;
+  background: var(--butter);
+}
+
+.faq-layout {
+  max-width: 1120px;
+}
+
+.faq-heading {
+  display: grid;
+  gap: 18px;
+  padding-bottom: 44px;
+  border-bottom: 1px solid rgba(38, 35, 34, 0.17);
+}
+
+.accordion-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+  counter-reset: faq;
+}
+
+.accordion-list > div {
+  counter-increment: faq;
+}
+
+.accordion-item {
+  overflow: hidden;
+  border: 1px solid rgba(38, 35, 34, 0.12);
+  border-radius: var(--radius-card);
+  background: var(--card);
+  box-shadow: 0 2px 0 rgba(38, 35, 34, 0.06);
+  transition:
+    transform 320ms var(--ease),
+    box-shadow 320ms ease,
+    border-color 220ms ease;
+}
+
+.accordion-list > div:nth-child(2) .accordion-item {
+  background: #e7d2cc;
+}
+
+.accordion-list > div:nth-child(3) .accordion-item {
+  background: var(--sage-soft);
+}
+
+.accordion-list > div:nth-child(4) .accordion-item {
+  background: var(--sky-soft);
+}
+
+.accordion-item[open] {
+  z-index: 2;
+  border-color: rgba(38, 35, 34, 0.28);
+  box-shadow: 0 3px 0 rgba(38, 35, 34, 0.07), 0 18px 36px rgba(94, 72, 48, 0.12);
+  transform: translateY(-3px);
+}
+
+.accordion-item summary {
+  display: grid;
+  min-height: 92px;
+  grid-template-columns: 46px 1fr auto;
+  align-items: center;
+  gap: 18px;
+  padding: 20px 22px;
+  font-family: var(--display);
+  font-size: clamp(1.12rem, 2vw, 1.42rem);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  list-style: none;
+  cursor: pointer;
+}
+
+.accordion-item summary::before {
+  color: var(--berry);
+  font-family: 'Noto Sans', sans-serif;
+  font-size: 0.68rem;
+  font-weight: 700;
+  content: '0' counter(faq);
+}
+
+.accordion-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.accordion-icon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(38, 35, 34, 0.2);
+  border-radius: 50%;
+  place-items: center;
+  transition:
+    color 220ms ease,
+    background 220ms ease,
+    transform 360ms var(--ease);
+}
+
+.accordion-icon svg {
+  width: 18px;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.accordion-item[open] .accordion-icon {
+  color: var(--card);
+  background: var(--berry);
+  transform: rotate(45deg);
+}
+
+details.accordion-item > .accordion-content {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 420ms var(--ease),
+    opacity 260ms ease;
+}
+
+details.accordion-item[open] > .accordion-content {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.accordion-content__inner {
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 80px 0 86px;
+  transition: padding-bottom 420ms var(--ease);
+}
+
+.accordion-item[open] .accordion-content__inner {
+  padding-bottom: 30px;
+}
+
+.accordion-content p {
+  max-width: 760px;
+  color: rgba(38, 35, 34, 0.72);
+  font-size: 0.9rem;
+  line-height: 1.72;
+}
+

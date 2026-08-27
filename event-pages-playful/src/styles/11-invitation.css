@@ -1,0 +1,135 @@
+/* Invitation letter */
+.invitation-section {
+  padding: var(--section-y) 0;
+  background: var(--paper);
+}
+
+.invitation-copy {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 32px 24px;
+  padding: clamp(52px, 7vw, 92px);
+  border: 1px solid rgba(38, 35, 34, 0.12);
+  border-radius: var(--radius-panel);
+  background: var(--card);
+  box-shadow: var(--shadow-paper);
+  transform: rotate(-0.55deg);
+}
+
+.invitation-copy::before {
+  position: absolute;
+  top: 34px;
+  right: 42px;
+  display: grid;
+  width: 110px;
+  aspect-ratio: 1;
+  border: 2px solid rgba(141, 79, 101, 0.28);
+  border-radius: 50%;
+  color: rgba(141, 79, 101, 0.58);
+  font-family: var(--display);
+  font-size: 1.1rem;
+  letter-spacing: 0.08em;
+  content: 'A & E';
+  place-items: center;
+  transform: rotate(12deg);
+}
+
+.invitation-copy::after {
+  position: absolute;
+  top: 80px;
+  right: 16px;
+  width: 165px;
+  height: 38px;
+  opacity: 0.38;
+  background: repeating-linear-gradient(0deg, transparent 0 6px, var(--berry) 6px 7px);
+  content: '';
+  transform: rotate(8deg);
+}
+
+.invitation-copy > .eyebrow {
+  z-index: 1;
+  grid-column: 1 / 5;
+  color: var(--berry);
+}
+
+.invitation-copy h2 {
+  z-index: 1;
+  grid-column: 1 / 8;
+  grid-row: 2;
+  max-width: 760px;
+  font-family: var(--display);
+  font-size: clamp(3.4rem, 6.5vw, 6.6rem);
+  font-weight: 500;
+  letter-spacing: -0.055em;
+  line-height: 0.92;
+}
+
+.large-copy {
+  z-index: 1;
+  grid-column: 8 / 13;
+  grid-row: 2;
+  align-self: end;
+  max-width: 440px;
+  color: var(--muted);
+  font-size: 1rem;
+  line-height: 1.72;
+}
+
+.parents-block {
+  z-index: 1;
+  grid-column: 1 / 13;
+  grid-row: 3;
+  margin-top: 40px;
+  padding-top: 30px;
+  border-top: 1px dashed rgba(38, 35, 34, 0.2);
+}
+
+.parents-list {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: stretch;
+  gap: 18px;
+}
+
+.parents-list > div {
+  display: flex;
+  min-height: 112px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px 28px;
+  border: 1px solid rgba(38, 35, 34, 0.1);
+  border-radius: var(--radius-card);
+}
+
+.parents-list > div:first-child {
+  background: var(--coral-soft);
+}
+
+.parents-list > div:last-child {
+  background: var(--sky-soft);
+}
+
+.parents-list span {
+  color: rgba(38, 35, 34, 0.64);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.parents-list strong {
+  font-family: var(--display);
+  font-size: clamp(1.2rem, 2vw, 1.6rem);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+
+.parents-list > i {
+  align-self: center;
+  width: 32px;
+  height: 1px;
+  background: var(--line);
+}
+

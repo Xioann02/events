@@ -1,0 +1,10 @@
+@media (hover: none) {
+  .hero-photo:hover img,
+  .timeline-item:hover,
+  .upload-zone:hover,
+  .ui-button:hover,
+  .slideshow-controls button:hover {
+    transform: none;
+  }
+}
+

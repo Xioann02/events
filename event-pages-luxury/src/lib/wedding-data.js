@@ -1,7 +1,5 @@
 import { MAP_LINKS as mapLinks } from './wedding-config.js'
 
-export { WEDDING_DATE } from './wedding-config.js'
-
 export const translations = {
   en: {
     language: 'Language',

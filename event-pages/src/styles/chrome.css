@@ -1,0 +1,67 @@
+.language-switch {
+  position: fixed;
+  z-index: 50;
+  top: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 54px;
+  padding: 4px;
+  border: 1px solid rgba(55, 51, 48, 0.14);
+  border-radius: 999px;
+  background: rgba(235, 233, 226, 0.8);
+  box-shadow: 0 10px 35px rgba(55, 51, 48, 0.1);
+  backdrop-filter: blur(18px) saturate(120%);
+  -webkit-backdrop-filter: blur(18px) saturate(120%);
+  animation: control-in 700ms var(--ease) 320ms both;
+}
+
+.language-switch span {
+  width: 1px;
+  height: 14px;
+  background: var(--line);
+}
+
+.language-switch button {
+  display: grid;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  color: rgba(29, 29, 27, 0.78);
+  background: transparent;
+  font-size: 0.73rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  place-items: center;
+  transition:
+    color 180ms ease,
+    background 180ms ease,
+    transform 220ms var(--ease);
+}
+
+.language-switch button.active {
+  color: var(--paper);
+  background: var(--ink);
+}
+
+.language-switch button:active {
+  transform: scale(0.94);
+}
+
+.section-shell {
+  width: min(1180px, calc(100% - 48px));
+  margin: 0 auto;
+}
+
+.eyebrow {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+

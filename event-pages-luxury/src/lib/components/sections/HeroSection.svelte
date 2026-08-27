@@ -1,7 +1,7 @@
 <script>
   import { onMount } from 'svelte'
   import modernCouple from '../../../assets/modern-couple.jpg'
-  import { WEDDING_DATE } from '../../wedding-config.js'
+  import { WEDDING_DATE, WEDDING_DISPLAY } from '../../wedding-config.js'
   import { downloadWeddingCalendar } from '../../utils/calendar.js'
   import { getCountdown, getCountdownLabel, padCountdown } from '../../utils/countdown.js'
   import Button from '../ui/Button.svelte'
@@ -27,9 +27,11 @@
   <div class="hero-shell">
     <div class="hero-scene">
       <div class="stationery-backdrop" aria-hidden="true">
-        <span class="backdrop-monogram">A <i>&</i> E</span>
+        <span class="backdrop-monogram">
+          {WEDDING_DISPLAY.initials[0]} <i>&</i> {WEDDING_DISPLAY.initials[1]}
+        </span>
         <span class="backdrop-line"></span>
-        <small>NICOSIA · CYPRUS</small>
+        <small>{WEDDING_DISPLAY.city} · {WEDDING_DISPLAY.country}</small>
       </div>
       <div class="confetti confetti--one" aria-hidden="true"></div>
       <div class="confetti confetti--two" aria-hidden="true"></div>
@@ -42,7 +44,9 @@
         <div class="envelope-back" aria-hidden="true"></div>
 
         <div class="invitation-card">
-          <p class="invitation-card__label">{copy.invitationEyebrow} · 19.09.26</p>
+          <p class="invitation-card__label">
+            {copy.invitationEyebrow} · {WEDDING_DISPLAY.shortDate}
+          </p>
           <h1 id="couple-names" aria-label={copy.names}>
             {#each copy.names.split(' & ') as person, index}
               <span>{person}</span>
@@ -55,7 +59,9 @@
               {#if index === 0}<i aria-hidden="true"></i>{/if}
             {/each}
           </time>
-          <span class="wax-seal" aria-hidden="true">A <i>&</i> E</span>
+          <span class="wax-seal" aria-hidden="true">
+            {WEDDING_DISPLAY.initials[0]} <i>&</i> {WEDDING_DISPLAY.initials[1]}
+          </span>
         </div>
 
         <div class="envelope-flap" aria-hidden="true"></div>
@@ -69,13 +75,16 @@
       <figure class="hero-photo">
         <span class="photo-pearl" aria-hidden="true"></span>
         <img src={modernCouple} alt={copy.heroAlt} width="1536" height="1024" fetchpriority="high" />
-        <figcaption><span>A & E</span><span>CYPRUS · 2026</span></figcaption>
+        <figcaption>
+          <span>{WEDDING_DISPLAY.initials.join(' & ')}</span>
+          <span>{WEDDING_DISPLAY.country} · {WEDDING_DISPLAY.year}</span>
+        </figcaption>
       </figure>
 
       <div class="date-medallion" aria-hidden="true">
-        <span>September</span>
-        <strong>19</strong>
-        <small>2026</small>
+        <span>{WEDDING_DISPLAY.month}</span>
+        <strong>{WEDDING_DISPLAY.day}</strong>
+        <small>{WEDDING_DISPLAY.year}</small>
       </div>
     </div>
 

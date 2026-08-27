@@ -30,7 +30,7 @@
 
 <SiteChrome {copy} {language} onLanguageChange={setLanguage} />
 
-<main id="main-content">
+<main id="main-content" tabindex="-1">
   <HeroSection {copy} />
   <InvitationSection {copy} />
   <TimelineSection {copy} />

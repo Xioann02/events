@@ -1,0 +1,245 @@
+:root {
+  font-family: 'Noto Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #292624;
+  background: #f3efe8;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  --paper: #f3efe8;
+  --card: #fffdf9;
+  --ink: #292624;
+  --coral: #b98276;
+  --coral-soft: #dfc3bc;
+  --butter: #ddd0ad;
+  --butter-soft: #eee6d1;
+  --sage: #bcc3b7;
+  --sage-soft: #dfe3dc;
+  --sky: #c5cecf;
+  --sky-soft: #e2e7e6;
+  --berry: #715864;
+  --berry-dark: #59454e;
+  --gold: #aa9362;
+  --muted: rgba(38, 35, 34, 0.68);
+  --line: rgba(38, 35, 34, 0.16);
+  --shadow-paper: 0 2px 0 rgba(38, 35, 34, 0.08), 0 24px 54px rgba(70, 55, 44, 0.12);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --shell: 1320px;
+  --section-y: clamp(104px, 10vw, 144px);
+  --radius-control: 12px;
+  --radius-card: 20px;
+  --radius-panel: 32px;
+  --radius-pill: 999px;
+  --display: 'Noto Serif Display', Georgia, serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  background: var(--paper);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  color: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+img,
+video {
+  display: block;
+  max-width: 100%;
+}
+
+figure,
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+h1[id],
+h2[id] {
+  scroll-margin-top: 96px;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+fieldset {
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+::selection {
+  color: var(--card);
+  background: var(--berry);
+}
+
+:focus-visible {
+  outline: 3px solid var(--berry);
+  outline-offset: 4px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: fixed;
+  z-index: 200;
+  top: 18px;
+  left: 50%;
+  min-height: 46px;
+  padding: 13px 18px;
+  border-radius: var(--radius-control);
+  color: var(--card);
+  background: var(--ink);
+  font-size: 0.82rem;
+  text-decoration: none;
+  transform: translate(-50%, -180%);
+  transition: transform 220ms var(--ease);
+}
+
+.skip-link:focus {
+  transform: translate(-50%, 0);
+}
+
+.playful-brand,
+.language-switch {
+  position: fixed;
+  z-index: 100;
+  top: 24px;
+  min-height: 52px;
+  border: 1px solid rgba(38, 35, 34, 0.14);
+  background: rgba(255, 253, 248, 0.92);
+  box-shadow: 0 8px 24px rgba(70, 55, 44, 0.1);
+}
+
+.playful-brand {
+  left: 24px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 17px;
+  border-radius: var(--radius-pill);
+  text-decoration: none;
+}
+
+.playful-brand > span {
+  font-family: var(--display);
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+}
+
+.playful-brand > span i {
+  color: var(--coral);
+  font-style: italic;
+}
+
+.playful-brand small {
+  padding-inline-start: 14px;
+  border-inline-start: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+
+.language-switch {
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px;
+  border-radius: var(--radius-pill);
+}
+
+.language-switch > span {
+  display: none;
+}
+
+.language-switch button {
+  min-width: 46px;
+  height: 42px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  color: var(--muted);
+  background: transparent;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition:
+    color 180ms ease,
+    background 180ms ease,
+    transform 180ms var(--ease);
+}
+
+.language-switch button.active {
+  color: var(--card);
+  background: var(--berry);
+}
+
+.language-switch button:active {
+  transform: scale(0.95);
+}
+
+.section-shell,
+.hero-shell {
+  width: min(var(--shell), calc(100% - 96px));
+  margin-inline: auto;
+}
+
+.eyebrow {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  line-height: 1.5;
+  text-transform: uppercase;
+}

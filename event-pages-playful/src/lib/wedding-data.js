@@ -1,13 +1,4 @@
-export const WEDDING_DATE = '2026-09-19T17:00:00+03:00'
-
-export const mapLinks = {
-  bride: 'https://www.google.com/maps/search/?api=1&query=Strovolos%2C+Cyprus',
-  groom: 'https://www.google.com/maps/search/?api=1&query=Engomi%2C+Cyprus',
-  church:
-    'https://www.google.com/maps/search/?api=1&query=Panagia+Chryseleousa+Church%2C+Strovolos%2C+Cyprus',
-  venue:
-    'https://www.google.com/maps/search/?api=1&query=Aelia+Wellness+Retreat%2C+Analiontas%2C+Cyprus',
-}
+import { MAP_LINKS as mapLinks } from './wedding-config.js'
 
 export const translations = {
   en: {

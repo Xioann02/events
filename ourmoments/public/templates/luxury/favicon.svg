@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="pearl" cx="30%" cy="24%" r="72%">
+      <stop offset="0" stop-color="#fff"/>
+      <stop offset=".32" stop-color="#f8f6f1"/>
+      <stop offset=".72" stop-color="#d8d2c9"/>
+      <stop offset="1" stop-color="#aaa298"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="18" fill="#ebe9e2"/>
+  <rect x="12" y="9" width="40" height="46" rx="8" fill="#f8f6f1" stroke="#1d1d1b" stroke-opacity=".12"/>
+  <path d="M12 32 32 47 52 32v18a5 5 0 0 1-5 5H17a5 5 0 0 1-5-5Z" fill="#d8d2c9"/>
+  <path d="m12 51 15-13 5 4 5-4 15 13" fill="#c8c0b5"/>
+  <circle cx="45" cy="17" r="6" fill="url(#pearl)"/>
+  <text x="32" y="29" fill="#1d1d1b" font-family="Georgia,serif" font-size="12" text-anchor="middle">A&amp;E</text>
+</svg>

@@ -1,0 +1,38 @@
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .scroll-reveal {
+    opacity: 1;
+    transform: none;
+  }
+
+  .envelope-flap {
+    z-index: 2;
+    transform: rotateX(-178deg);
+  }
+
+  .invitation-card {
+    opacity: 1;
+    transform: translateY(var(--card-rise)) rotateZ(1.2deg);
+  }
+
+  .floating-rings {
+    opacity: 1;
+    transform: rotate(-10deg);
+  }
+
+  .confetti {
+    opacity: 0.8;
+  }
+}

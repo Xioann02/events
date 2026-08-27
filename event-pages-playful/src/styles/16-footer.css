@@ -1,0 +1,70 @@
+/* Footer postmark */
+footer {
+  position: relative;
+  display: flex;
+  min-height: 450px;
+  overflow: hidden;
+  padding: 72px 32px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--card);
+  background: var(--berry);
+  text-align: center;
+}
+
+footer::before,
+footer::after {
+  position: absolute;
+  border: 2px solid rgba(255, 253, 248, 0.16);
+  border-radius: 50%;
+  content: '';
+}
+
+footer::before {
+  width: 390px;
+  aspect-ratio: 1;
+}
+
+footer::after {
+  width: 330px;
+  aspect-ratio: 1;
+  border-style: dashed;
+}
+
+.footer-monogram,
+footer > p {
+  position: relative;
+  z-index: 1;
+}
+
+.footer-monogram {
+  order: 2;
+  margin-top: 34px;
+  font-family: var(--display);
+  font-size: 1rem;
+  letter-spacing: 0.04em;
+}
+
+.footer-monogram span {
+  margin: 0 5px;
+  color: var(--butter);
+  font-style: italic;
+}
+
+footer > p:nth-child(2) {
+  order: 1;
+  font-family: var(--display);
+  font-size: clamp(4rem, 11vw, 10rem);
+  font-weight: 500;
+  letter-spacing: -0.07em;
+  line-height: 0.8;
+}
+
+footer > p:last-child {
+  order: 3;
+  margin-top: 12px;
+  color: rgba(255, 253, 248, 0.7);
+  font-size: 0.72rem;
+}
+

@@ -1,0 +1,96 @@
+/* Shared controls */
+.ui-button {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 20px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    color 200ms ease,
+    background 200ms ease,
+    border-color 200ms ease,
+    transform 220ms var(--ease),
+    box-shadow 220ms ease;
+}
+
+.ui-button svg {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ui-button:hover {
+  transform: translateY(-2px);
+}
+
+.ui-button:active {
+  transform: translateY(0) scale(0.985);
+}
+
+.ui-button--large {
+  min-height: 54px;
+  padding-inline: 24px;
+}
+
+.ui-button--primary {
+  color: var(--card);
+  background: var(--ink);
+  box-shadow: 0 8px 18px rgba(38, 35, 34, 0.15);
+}
+
+.ui-button--primary:hover {
+  background: var(--berry-dark);
+}
+
+.ui-button--outline {
+  border-color: rgba(38, 35, 34, 0.28);
+  background: transparent;
+}
+
+.ui-button--outline:hover {
+  background: rgba(255, 253, 248, 0.45);
+}
+
+.ui-button--light {
+  color: var(--ink);
+  background: var(--card);
+}
+
+.ui-button--light:hover {
+  background: var(--butter-soft);
+}
+
+.ui-button--link {
+  min-height: 44px;
+  justify-content: flex-start;
+  padding: 0;
+  border-radius: 0;
+  color: inherit;
+  background: transparent;
+  font-size: 0.76rem;
+}
+
+.ui-button--link:hover {
+  transform: none;
+}
+
+.ui-button--link svg {
+  width: 16px;
+  transition: transform 220ms var(--ease);
+}
+
+.ui-button--link:hover svg {
+  transform: translateX(4px);
+}
+

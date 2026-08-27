@@ -1,0 +1,60 @@
+/* Motion */
+.reveal {
+  animation: reveal-up 760ms var(--ease) both;
+}
+
+.hero-photo.reveal {
+  animation-delay: 100ms;
+}
+
+.countdown-block.reveal {
+  animation-delay: 190ms;
+}
+
+.scroll-reveal {
+  opacity: 0;
+  transform: translate3d(0, var(--reveal-distance, 18px), 0)
+    scale(var(--reveal-scale, 1));
+  transition:
+    opacity 600ms ease var(--reveal-delay, 0ms),
+    transform 680ms var(--ease) var(--reveal-delay, 0ms);
+}
+
+.scroll-reveal.is-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: scale(1.012);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes success-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
