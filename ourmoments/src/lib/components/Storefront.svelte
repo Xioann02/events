@@ -1,6 +1,6 @@
 <script>
   import { getOccasion, templates } from '../catalog.js'
-  import editorialHero from '../../assets/editorial-hero-collage-v3.jpg'
+  import editorialHero from '../../assets/gathering-fullscreen-hero.png'
   import LogoMark from './LogoMark.svelte'
   import ExactTemplateFrame from './ExactTemplateFrame.svelte'
 
@@ -76,22 +76,23 @@
 <main id="main-content">
   <section class="home-hero" id="top">
     <div class="hero-copy">
-      <p class="overline"><span></span> Digital invitations, made personal</p>
-      <div class="hero-heading-row">
-        <h1>Your moment,<br /><em>beautifully told.</em></h1>
-        <div class="hero-actions">
-          <button class="button button--dark button--large" type="button" onclick={scrollToTemplates}>
-            Create your invitation
-            <span aria-hidden="true">↗</span>
-          </button>
-        </div>
+      <p class="overline"><span></span> Digital invitations for every gathering</p>
+      <h1>Every detail,<br /><em>in one place.</em></h1>
+      <p class="hero-lede">
+        Birthdays, dinners, weddings and everything between—with your invitation, RSVP and event details in one simple link.
+      </p>
+      <div class="hero-actions">
+        <button class="button button--dark button--large" type="button" onclick={scrollToTemplates}>
+          Explore templates
+          <span aria-hidden="true">↘</span>
+        </button>
       </div>
     </div>
 
     <div class="hero-art">
       <img
         src={editorialHero}
-        alt="Editorial collage of birthday, baby shower and graduation invitation templates"
+        alt="Friends and family gathering around a long table in a contemporary Mediterranean courtyard"
       />
     </div>
 
