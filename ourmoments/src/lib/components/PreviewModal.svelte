@@ -1,13 +1,12 @@
 <script>
   import { onMount } from 'svelte'
-  import { getOccasion, getTemplate } from '../catalog.js'
+  import { getTemplate } from '../catalog.js'
   import PreviewFrame from './PreviewFrame.svelte'
 
   let { draft, onClose, onCustomize } = $props()
   let closeButton
   let dialog
   let mode = $state('desktop')
-  let occasion = $derived(getOccasion(draft.occasionId))
   let template = $derived(getTemplate(draft.templateId))
 
   onMount(() => {
@@ -43,12 +42,8 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="modal-backdrop" role="presentation" onclick={(event) => event.target === event.currentTarget && onClose()}>
-  <div class="preview-modal" role="dialog" aria-modal="true" aria-labelledby="preview-modal-title" bind:this={dialog}>
+  <div class="preview-modal" role="dialog" aria-modal="true" aria-label={`${template.name} preview`} bind:this={dialog}>
     <header class="preview-modal__header">
-      <div>
-        <span>{occasion.label} template</span>
-        <h2 id="preview-modal-title">{template.name}</h2>
-      </div>
       <div class="preview-modal__actions">
         <div class="device-toggle" aria-label="Preview size">
           <button class:active={mode === 'desktop'} type="button" onclick={() => (mode = 'desktop')} aria-label="Desktop preview">
@@ -63,12 +58,12 @@
     </header>
 
     <div class="preview-modal__stage">
-      <PreviewFrame {draft} {mode} />
+      <PreviewFrame {draft} {mode} showChrome={false} />
     </div>
 
     <footer class="preview-modal__footer">
       <p><strong>{template.name}</strong><span>{template.personality} · €{template.price}</span></p>
-      <button class="button button--dark" type="button" onclick={onCustomize}>Customize this template <span aria-hidden="true">→</span></button>
+      <button class="button button--dark" type="button" onclick={onCustomize}>Create your invitation <span aria-hidden="true">→</span></button>
     </footer>
   </div>
 </div>

@@ -15,7 +15,7 @@
   let viewport = $state()
   let observer
   let resizeObserver
-  let measuredWidth = 0
+  let measuredWidth = $state(0)
   let resizeFrame
   let loaded = $state(false)
   let previousTemplateId = $state('')
@@ -63,11 +63,18 @@
       const width = entry.contentRect.width
       if (Math.abs(width - measuredWidth) < 0.5) return
       measuredWidth = width
-      cancelAnimationFrame(resizeFrame)
-      resizeFrame = requestAnimationFrame(() => viewport?.style.setProperty('--frame-width', width))
     })
     resizeObserver.observe(viewport)
     return () => resizeObserver?.disconnect()
+  })
+
+  $effect(() => {
+    const width = measuredWidth
+    const targetWidth = sourceWidth
+    if (!viewport || !width) return
+
+    cancelAnimationFrame(resizeFrame)
+    resizeFrame = requestAnimationFrame(() => viewport?.style.setProperty('--frame-scale', width / targetWidth))
   })
 
   onDestroy(() => {
@@ -118,10 +125,9 @@
   .exact-frame__viewport {
     position: relative;
     width: 100%;
-    height: calc(var(--viewport-height) * 1px * (var(--frame-width, 1080) / var(--source-width)));
+    height: calc(var(--viewport-height) * 1px * var(--frame-scale, 0.75));
     min-height: 400px;
     overflow: hidden;
-    container-type: inline-size;
     background: #dedbd5;
   }
 
@@ -132,14 +138,14 @@
     width: calc(var(--source-width) * 1px);
     height: calc(var(--viewport-height) * 1px);
     border: 0;
-    transform: scale(calc(100cqw / var(--source-width)));
+    transform: scale(var(--frame-scale, 0.75));
     transform-origin: top left;
   }
 
   .exact-frame--mobile .exact-frame__viewport iframe {
     width: 390px;
     height: 844px;
-    transform: scale(calc(100cqw / 390));
+    transform: scale(var(--frame-scale, 1));
   }
 
   .exact-frame--thumbnail {

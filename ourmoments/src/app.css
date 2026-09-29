@@ -2744,9 +2744,6 @@ p {
     min-height: 110px;
   }
 
-  .preview-modal__header .device-toggle {
-    display: none;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

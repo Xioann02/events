@@ -1,6 +1,6 @@
 <script>
-  import sparklerHero from '../../assets/sparkler-hero.jpg'
   import { getOccasion, templates } from '../catalog.js'
+  import editorialHero from '../../assets/editorial-hero-collage-v3.jpg'
   import LogoMark from './LogoMark.svelte'
   import ExactTemplateFrame from './ExactTemplateFrame.svelte'
 
@@ -69,7 +69,7 @@
       <span>Cart</span>
       <i>{cartCount}</i>
     </button>
-    <button class="header-cta" type="button" onclick={scrollToTemplates}>Find your design</button>
+    <button class="header-cta" type="button" onclick={scrollToTemplates}>Create your invitation</button>
   </div>
 </header>
 
@@ -88,10 +88,11 @@
       </div>
     </div>
 
-    <div class="hero-visual">
-      <figure class="hero-image">
-        <img src={sparklerHero} alt="A sparkler flares against a dark background with colourful lights" />
-      </figure>
+    <div class="hero-art">
+      <img
+        src={editorialHero}
+        alt="Editorial collage of birthday, baby shower and graduation invitation templates"
+      />
     </div>
 
   </section>
@@ -186,7 +187,7 @@
               <p class="template-description">{template.description}</p>
               <div class="template-actions">
                 <button class="button button--cream" type="button" onclick={() => onCustomize(template.id)}>
-                  Use this template <span aria-hidden="true">→</span>
+                  Create your invitation <span aria-hidden="true">→</span>
                 </button>
                 <button
                   class="icon-button icon-button--light"
@@ -216,7 +217,7 @@
         <h2 id="how-heading">From idea to invite<br />in three easy steps.</h2>
         <p>No design degree. No endless settings. Just the useful things, exactly where you expect them.</p>
         <button class="button button--dark" type="button" onclick={scrollToTemplates}>
-          Start creating <span aria-hidden="true">↗</span>
+          Create your invitation <span aria-hidden="true">↗</span>
         </button>
       </div>
 
@@ -244,9 +245,9 @@
     <div class="closing-shape closing-shape--one" aria-hidden="true"></div>
     <div class="closing-shape closing-shape--two" aria-hidden="true"></div>
     <p class="overline"><span></span> A little corner of the internet, just for you</p>
-    <h2>Some moments are too good<br /><em>for a group chat.</em></h2>
-    <button class="button button--cream button--large" type="button" onclick={scrollToTemplates}>
-      Make yours <span aria-hidden="true">↗</span>
+    <h2>Some moments are too special<br /><em>not to share.</em></h2>
+    <button class="button button--dark button--large" type="button" onclick={scrollToTemplates}>
+      Create your invitation <span aria-hidden="true">↗</span>
     </button>
   </section>
 </main>
