@@ -12,6 +12,8 @@
     onTemplateChange,
     onAddToCart,
     onOpenCart,
+    primaryActionLabel = '',
+    showCart = true,
   } = $props()
 
   let previewMode = $state('desktop')
@@ -21,6 +23,7 @@
 
   let occasion = $derived(getOccasion(draft.occasionId))
   let template = $derived(getTemplate(draft.templateId))
+  let primaryLabel = $derived(primaryActionLabel || `Add to cart · €${template.price}`)
   let hiddenSections = $derived(sectionOrder.filter((sectionId) => !draft.sections[sectionId]))
 
   function announce(message) {
@@ -99,12 +102,14 @@
     </div>
 
     <div class="editor-topbar__actions">
-      <button class="editor-cart" type="button" onclick={onOpenCart} aria-label={`Open cart, ${cartCount} items`}>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 8.5h11l-.6 11h-9.8l-.6-11Z" /><path d="M9 9V7a3 3 0 0 1 6 0v2" /></svg>
-        <span>{cartCount}</span>
-      </button>
+      {#if showCart}
+        <button class="editor-cart" type="button" onclick={onOpenCart} aria-label={`Open cart, ${cartCount} items`}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 8.5h11l-.6 11h-9.8l-.6-11Z" /><path d="M9 9V7a3 3 0 0 1 6 0v2" /></svg>
+          <span>{cartCount}</span>
+        </button>
+      {/if}
       <button class="button button--dark add-cart-top" type="button" onclick={onAddToCart}>
-        Add to cart · €{template.price}
+        {primaryLabel}
         <span aria-hidden="true">→</span>
       </button>
     </div>
@@ -366,6 +371,6 @@
     <button type="button" onclick={() => (mobilePane = mobilePane === 'edit' ? 'preview' : 'edit')}>
       {mobilePane === 'edit' ? 'Preview' : 'Keep editing'}
     </button>
-    <button type="button" onclick={onAddToCart}>Add to cart · €{template.price}</button>
+    <button type="button" onclick={onAddToCart}>{primaryLabel}</button>
   </div>
 </div>

@@ -3,7 +3,7 @@
   import { formatEventDate, getTemplate } from '../catalog.js'
   import LogoMark from './LogoMark.svelte'
 
-  let { items = [], total = 0, onClose, onRemove, onEdit } = $props()
+  let { items = [], total = 0, onClose, onRemove, onEdit, onCheckout } = $props()
   let closeButton
   let dialog
 
@@ -84,9 +84,9 @@
     {#if items.length > 0}
       <footer class="cart-drawer__footer">
         <div class="cart-total"><span>Subtotal</span><strong>€{total}</strong></div>
-        <p>One-time purchase · Your invitation details are included</p>
-        <button class="checkout-button" type="button" disabled>
-          Checkout coming soon
+        <p>One-time purchase · Website and private planning dashboard included</p>
+        <button class="checkout-button" type="button" onclick={onCheckout}>
+          Checkout
           <span aria-hidden="true">→</span>
         </button>
         <button class="continue-button" type="button" onclick={onClose}>Continue designing</button>

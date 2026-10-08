@@ -1,6 +1,6 @@
 <script>
   import { getOccasion, templates } from '../catalog.js'
-  import editorialHero from '../../assets/gathering-fullscreen-hero.png'
+  import editorialHero from '../../assets/gathering-editorial-hero-v21.png'
   import LogoMark from './LogoMark.svelte'
   import ExactTemplateFrame from './ExactTemplateFrame.svelte'
 
@@ -29,12 +29,20 @@
     onPreview,
     onAddToCart,
     onOpenCart,
+    dashboardAvailable = false,
+    onDashboardAccess,
+    onAccountAccess,
   } = $props()
 
   let selectedOccasion = $derived(getOccasion(selectedOccasionId))
 
   function scrollToTemplates() {
     document.getElementById('templates')?.scrollIntoView({ behavior: 'smooth' })
+  }
+
+  function openDashboardLink(event) {
+    event.preventDefault()
+    onDashboardAccess()
   }
 </script>
 
@@ -56,11 +64,12 @@
 
   <nav class="desktop-nav" aria-label="Main navigation">
     <a href="#website-includes">Website</a>
-    <a href="#dashboard-includes">Dashboard</a>
+    <a href="?dashboard=overview" onclick={openDashboardLink}>Dashboard</a>
     <a href="#templates">Templates</a>
   </nav>
 
   <div class="header-actions">
+    <button class="dashboard-access-button" type="button" onclick={onAccountAccess}>{dashboardAvailable ? 'My account' : 'Log in'}</button>
     <button class="cart-button" type="button" onclick={onOpenCart} aria-label={`Open cart, ${cartCount} items`}>
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M6.5 8.5h11l-.6 11h-9.8l-.6-11Z" />
@@ -76,23 +85,24 @@
 <main id="main-content">
   <section class="home-hero" id="top">
     <div class="hero-copy">
-      <p class="overline"><span></span> Digital invitations for every gathering</p>
-      <h1>Every detail,<br /><em>in one place.</em></h1>
-      <p class="hero-lede">
-        Birthdays, dinners, weddings and everything between—with your invitation, RSVP and event details in one simple link.
-      </p>
-      <div class="hero-actions">
-        <button class="button button--dark button--large" type="button" onclick={scrollToTemplates}>
-          Explore templates
-          <span aria-hidden="true">↘</span>
-        </button>
+      <h1>Every detail, <em>in one place</em></h1>
+      <div class="hero-support">
+        <p class="hero-lede">
+          Create your invitation, collect RSVPs and share every event detail—all with one link.
+        </p>
+        <div class="hero-actions">
+          <button class="button button--dark button--large" type="button" onclick={scrollToTemplates}>
+            Explore templates
+            <span aria-hidden="true">↘</span>
+          </button>
+        </div>
       </div>
     </div>
 
     <div class="hero-art">
       <img
         src={editorialHero}
-        alt="Friends and family gathering around a long table in a contemporary Mediterranean courtyard"
+        alt="Two guests viewing a digital invitation on a minimal Mediterranean terrace decorated with fairy lights"
       />
     </div>
 
@@ -259,5 +269,5 @@
     <span>ourmoments<span>.io</span></span>
   </div>
   <p>Beautifully simple invitations for the days worth remembering.</p>
-  <div class="footer-links"><a href="#website-includes">Website</a><a href="#dashboard-includes">Dashboard</a><a href="#templates">Templates</a><span>© 2026</span></div>
+  <div class="footer-links"><a href="#website-includes">Website</a><a href="?dashboard=overview" onclick={openDashboardLink}>Dashboard</a><a href="#templates">Templates</a><span>© 2026</span></div>
 </footer>
