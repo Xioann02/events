@@ -1,8 +1,8 @@
 <script>
   import { getOccasion, templates } from '../catalog.js'
-  import editorialHero from '../../assets/gathering-editorial-hero-v21.png'
   import LogoMark from './LogoMark.svelte'
   import ExactTemplateFrame from './ExactTemplateFrame.svelte'
+  import HeroFeatureScene from './HeroFeatureScene.svelte'
 
   const websiteFeatures = [
     { title: 'Event information', detail: 'Keep every date, time and venue detail together.' },
@@ -69,7 +69,6 @@
   </nav>
 
   <div class="header-actions">
-    <button class="dashboard-access-button" type="button" onclick={onAccountAccess}>{dashboardAvailable ? 'My account' : 'Log in'}</button>
     <button class="cart-button" type="button" onclick={onOpenCart} aria-label={`Open cart, ${cartCount} items`}>
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M6.5 8.5h11l-.6 11h-9.8l-.6-11Z" />
@@ -78,7 +77,7 @@
       <span>Cart</span>
       <i>{cartCount}</i>
     </button>
-    <button class="header-cta" type="button" onclick={scrollToTemplates}>Create your invitation</button>
+    <button class="header-cta" type="button" onclick={onAccountAccess}>My account</button>
   </div>
 </header>
 
@@ -100,10 +99,7 @@
     </div>
 
     <div class="hero-art">
-      <img
-        src={editorialHero}
-        alt="Two guests viewing a digital invitation on a minimal Mediterranean terrace decorated with fairy lights"
-      />
+      <HeroFeatureScene />
     </div>
 
   </section>

@@ -1,4 +1,5 @@
 <script>
+  import { tick } from 'svelte'
   import { formatEventDate, getTemplate } from '../catalog.js'
   import { createGift, createGuest, createTable, dashboardSummary } from '../dashboard-data.js'
   import couplePhoto from '../../assets/modern-couple.jpg'
@@ -13,7 +14,6 @@
     { id: 'overview', label: 'Overview', glyph: '⌂' },
     { id: 'guests', label: 'Guest list', glyph: '◎' },
     { id: 'seating', label: 'Table seating', glyph: '⊞' },
-    { id: 'rsvps', label: 'RSVPs', glyph: '✓' },
     { id: 'photos', label: 'Photos', glyph: '▧' },
     { id: 'gifts', label: 'Gifts', glyph: '◇' },
     { id: 'website', label: 'Website', glyph: '↗' },
@@ -29,14 +29,16 @@
   let guestToDelete = $state(null)
   let openGuestMenuId = $state('')
   let editingGuestId = $state('')
+  let editingGuestField = $state('')
+  let guestEditDirty = $state(false)
   let rsvpFilter = $state('all')
   let showGuestForm = $state(false)
   let showTableForm = $state(false)
   let showGiftForm = $state(false)
   let draggedGuestId = $state('')
   let copied = $state(false)
-  let guestForm = $state({ name: '', email: '', phone: '', party: 1, status: 'pending', note: '' })
-  let guestEditForm = $state({ name: '', email: '', phone: '', party: 1, status: 'pending', note: '' })
+  let guestForm = $state({ name: '', email: '', phone: '', adults: 1, children: 0, status: 'pending', note: '', meal: '' })
+  let guestEditForm = $state({ name: '', email: '', phone: '', adults: 1, children: 0, status: 'pending', note: '', meal: '' })
   let tableForm = $state({ capacity: 8 })
   let giftForm = $state({ guestId: '', guest: '', type: 'money', amount: '', currency: 'EUR', gift: '', note: '' })
 
@@ -72,7 +74,7 @@
     if (!guestForm.name.trim()) return
     const guest = createGuest(guestForm)
     data = { ...data, guests: [...data.guests, guest] }
-    guestForm = { name: '', email: '', phone: '', party: 1, status: 'pending', note: '' }
+    guestForm = { name: '', email: '', phone: '', adults: 1, children: 0, status: 'pending', note: '', meal: '' }
     showGuestForm = false
     onNotify('Guest added to your list.')
   }
@@ -80,12 +82,12 @@
   function openGuestRow() {
     openGuestMenuId = ''
     editingGuestId = ''
-    guestForm = { name: '', email: '', phone: '', party: 1, status: 'pending', note: '' }
+    guestForm = { name: '', email: '', phone: '', adults: 1, children: 0, status: 'pending', note: '', meal: '' }
     showGuestForm = true
   }
 
   function cancelGuestRow() {
-    guestForm = { name: '', email: '', phone: '', party: 1, status: 'pending', note: '' }
+    guestForm = { name: '', email: '', phone: '', adults: 1, children: 0, status: 'pending', note: '', meal: '' }
     showGuestForm = false
   }
 
@@ -110,33 +112,73 @@
     if (!event.target.closest?.('.guest-action-menu')) openGuestMenuId = ''
   }
 
-  function startEditingGuest(guest) {
+  function loadGuestEditForm(guest) {
     guestEditForm = {
       name: guest.name,
       email: guest.email,
       phone: guest.phone,
-      party: guest.party,
+      adults: guest.adults ?? guest.party,
+      children: guest.children ?? 0,
       status: guest.status,
       note: guest.note,
+      meal: guest.meal,
     }
     editingGuestId = guest.id
+    editingGuestField = ''
+    guestEditDirty = false
     openGuestMenuId = ''
     showGuestForm = false
   }
 
+  async function openGuestField(field, guest) {
+    if (editingGuestId !== guest.id) {
+      if (editingGuestId && guestEditDirty) return
+      loadGuestEditForm(guest)
+    }
+    editingGuestField = field
+    await tick()
+    const input = document.querySelector(`[data-guest-edit="${field}"]`)
+    input?.focus()
+    if (input?.setSelectionRange) {
+      const end = input.value.length
+      input.setSelectionRange(end, end)
+    }
+  }
+
+  function markGuestEditDirty() {
+    guestEditDirty = true
+  }
+
+  function changeGuestStatus(guest, status) {
+    if (editingGuestId !== guest.id) {
+      if (editingGuestId && guestEditDirty) return
+      loadGuestEditForm(guest)
+    }
+    guestEditForm.status = status
+    guestEditDirty = true
+  }
+
   function saveGuestEdit() {
     if (!guestEditForm.name.trim()) return
+    const adults = Math.max(1, Number(guestEditForm.adults) || 1)
+    const children = Math.max(0, Number(guestEditForm.children) || 0)
     updateGuest(editingGuestId, {
       ...guestEditForm,
       name: guestEditForm.name.trim(),
-      party: Math.max(1, Number(guestEditForm.party) || 1),
+      adults,
+      children,
+      party: adults + children,
     })
     editingGuestId = ''
+    editingGuestField = ''
+    guestEditDirty = false
     onNotify('Guest updated.')
   }
 
   function cancelGuestEdit() {
     editingGuestId = ''
+    editingGuestField = ''
+    guestEditDirty = false
   }
 
   function sortGuests(key) {
@@ -266,6 +308,27 @@
     return `${account.firstName?.[0] ?? ''}${account.lastName?.[0] ?? ''}`.toUpperCase() || 'OM'
   }
 
+  function avatarTone(value = '') {
+    const hash = [...String(value)].reduce((total, character) => total + character.charCodeAt(0), 0)
+    return `avatar-tone--${(hash % 6) + 1}`
+  }
+
+  function guestAdults(guest) {
+    return guest.adults ?? guest.party
+  }
+
+  function guestChildren(guest) {
+    return guest.children ?? 0
+  }
+
+  function partyLabel(guest) {
+    const adults = guestAdults(guest)
+    const children = guestChildren(guest)
+    const adultLabel = `${adults} ${adults === 1 ? 'adult' : 'adults'}`
+    if (children === 0) return adultLabel
+    return `${adultLabel}, ${children} ${children === 1 ? 'child' : 'children'}`
+  }
+
   function closeForms() {
     showGuestForm = false
     showTableForm = false
@@ -307,7 +370,7 @@
         <button class:active={active === item.id} type="button" onclick={() => navigate(item.id)}>
           <i aria-hidden="true">{item.glyph}</i>
           <span>{item.label}</span>
-          {#if item.id === 'rsvps' && summary.pending > 0}<b>{summary.pending}</b>{/if}
+          {#if item.id === 'guests' && summary.pending > 0}<b>{summary.pending}</b>{/if}
         </button>
       {/each}
     </nav>
@@ -364,7 +427,7 @@
             </section>
 
             <section class="dashboard-panel dashboard-activity">
-              <div class="dashboard-panel-heading"><div><span>Live updates</span><h2>Recent activity</h2></div><button type="button" onclick={() => navigate('rsvps')}>View all</button></div>
+              <div class="dashboard-panel-heading"><div><span>Live updates</span><h2>Recent activity</h2></div><button type="button" onclick={() => navigate('guests')}>View all</button></div>
               <ol>
                 {#each data.activity as item}
                   <li><i class:positive={item.tone === 'positive'}></i><p><strong>{item.text}</strong><span>{item.time}</span></p></li>
@@ -397,6 +460,8 @@
             <div><p class="dashboard-eyebrow">Guest management</p><h1 id="guests-heading">Your guest list</h1><p>Keep every invitation, reply and dietary note together.</p></div>
           </header>
 
+          <div class="rsvp-stat-grid"><button class:active={rsvpFilter === 'all'} onclick={() => (rsvpFilter = 'all')} type="button"><span>All guests</span><strong>{summary.total}</strong></button><button class:active={rsvpFilter === 'attending'} onclick={() => (rsvpFilter = 'attending')} type="button"><span>Attending</span><strong>{summary.attending}</strong></button><button class:active={rsvpFilter === 'pending'} onclick={() => (rsvpFilter = 'pending')} type="button"><span>Awaiting reply</span><strong>{summary.pending}</strong></button><button class:active={rsvpFilter === 'declined'} onclick={() => (rsvpFilter = 'declined')} type="button"><span>Declined</span><strong>{summary.declined}</strong></button></div>
+
           <div class="dashboard-toolbar dashboard-guest-toolbar">
             <label class="dashboard-search"><span aria-hidden="true">⌕</span><input bind:value={guestSearch} placeholder="Search guests or email" aria-label="Search guests" /></label>
             <span>{filteredGuests.length} guests shown</span>
@@ -408,45 +473,78 @@
                 <th aria-sort={guestSort.key === 'name' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={guestSort.key === 'name'} type="button" onclick={() => sortGuests('name')}>Name <span aria-hidden="true">{guestSort.key === 'name' && guestSort.direction === 'desc' ? '↓' : '↑'}</span></button></th>
                 <th aria-sort={guestSort.key === 'party' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={guestSort.key === 'party'} type="button" onclick={() => sortGuests('party')}>Number of people <span aria-hidden="true">{guestSort.key === 'party' && guestSort.direction === 'desc' ? '↓' : '↑'}</span></button></th>
                 <th aria-sort={guestSort.key === 'email' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={guestSort.key === 'email'} type="button" onclick={() => sortGuests('email')}>Contact details <span aria-hidden="true">{guestSort.key === 'email' && guestSort.direction === 'desc' ? '↓' : '↑'}</span></button></th>
-                <th aria-sort={guestSort.key === 'note' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={guestSort.key === 'note'} type="button" onclick={() => sortGuests('note')}>Note <span aria-hidden="true">{guestSort.key === 'note' && guestSort.direction === 'desc' ? '↓' : '↑'}</span></button></th>
+                <th>Note</th>
+                <th>RSVP</th>
                 <th class="guest-action-heading"><button class="guest-add-icon dashboard-primary" type="button" onclick={openGuestRow}><span aria-hidden="true">+</span> Add guest</button></th>
               </tr></thead>
               <tbody>
                 {#if showGuestForm}
                   <tr class="dashboard-inline-row">
                     <td><input bind:value={guestForm.name} aria-label="Guest name" required placeholder="Full name" /></td>
-                    <td><input class="guest-number-input" bind:value={guestForm.party} type="number" min="1" max="20" aria-label="Number of people" /></td>
+                    <td><div class="guest-party-fields"><label><span>Adults</span><select bind:value={guestForm.adults} aria-label="Number of adults">{#each Array(20) as _, index}<option value={index + 1}>{index + 1}</option>{/each}</select></label><label><span>Children</span><select bind:value={guestForm.children} aria-label="Number of children">{#each Array(11) as _, index}<option value={index}>{index}</option>{/each}</select></label></div></td>
                     <td><div class="guest-contact"><input bind:value={guestForm.email} type="email" aria-label="Guest email" placeholder="Email" /><input bind:value={guestForm.phone} type="tel" aria-label="Guest phone" placeholder="Phone" /></div></td>
-                    <td><textarea bind:value={guestForm.note} rows="2" aria-label="Guest note" placeholder="Add note"></textarea></td>
-                    <td class="guest-row-action-cell"><div class="inline-row-actions guest-row-actions"><button class="guest-save-button" type="button" onclick={addGuest} aria-label="Save guest" title="Save guest">OK</button><button class="guest-cancel-button" type="button" onclick={cancelGuestRow} aria-label="Close guest row" title="Close">×</button></div></td>
+                    <td><input class="guest-note-input" bind:value={guestForm.meal} aria-label="Guest note" placeholder="Add note" /></td>
+                    <td><select class={`status-select status-select--${guestForm.status}`} bind:value={guestForm.status} aria-label="Attendance status"><option value="attending">Attending</option><option value="pending">Pending</option><option value="declined">Declined</option></select></td>
+                    <td class="guest-row-action-cell"><div class="inline-row-actions guest-row-actions"><button class="guest-save-button" type="button" onclick={addGuest} aria-label="Save guest" title="Save guest">Save</button><button class="guest-cancel-button" type="button" onclick={cancelGuestRow} aria-label="Close guest row" title="Close">×</button></div></td>
                   </tr>
                 {/if}
                 {#each sortedGuests as guest, index}
-                  {#if editingGuestId === guest.id}
-                    <tr class="dashboard-edit-row">
-                      <td><input bind:value={guestEditForm.name} aria-label="Guest name" required placeholder="Full name" /></td>
-                      <td><input class="guest-number-input" bind:value={guestEditForm.party} type="number" min="1" max="20" aria-label="Number of people" /></td>
-                      <td><div class="guest-contact"><input bind:value={guestEditForm.email} type="email" aria-label="Guest email" placeholder="Email" /><input bind:value={guestEditForm.phone} type="tel" aria-label="Guest phone" placeholder="Phone" /></div></td>
-                      <td><textarea bind:value={guestEditForm.note} rows="2" aria-label="Guest note" placeholder="Add note"></textarea></td>
-                      <td class="guest-row-action-cell"><div class="inline-row-actions guest-row-actions"><button class="guest-save-button" type="button" onclick={saveGuestEdit} aria-label="Save guest changes" title="Save changes">OK</button><button class="guest-cancel-button" type="button" onclick={cancelGuestEdit} aria-label="Cancel editing" title="Cancel">×</button></div></td>
-                    </tr>
-                  {:else}
-                    <tr>
-                      <td><i>{guest.name.slice(0, 1)}</i><span><strong>{guest.name}</strong></span></td>
-                      <td><span>{guest.party}</span></td>
-                      <td><div class="guest-contact-copy"><span>{guest.email || 'No email'}</span><small>{guest.phone || 'No phone'}</small></div></td>
-                      <td><span class="guest-note-copy">{guest.note || 'No note'}</span></td>
-                      <td class="guest-row-action-cell">
+                  {@const isEditing = editingGuestId === guest.id}
+                  <tr>
+                    <td>
+                      <i class={avatarTone(guest.id || guest.name)}>{guest.name.slice(0, 1)}</i>
+                      {#if isEditing && editingGuestField === 'name'}
+                        <input class="guest-inline-editor" data-guest-edit="name" bind:value={guestEditForm.name} oninput={markGuestEditDirty} aria-label="Guest name" />
+                      {:else if isEditing}
+                        <button class="guest-edit-value guest-edit-value--strong" type="button" onclick={() => openGuestField('name', guest)}>{guestEditForm.name}</button>
+                      {:else}
+                        <button class="guest-edit-value guest-edit-value--strong" type="button" onclick={() => openGuestField('name', guest)}>{guest.name}</button>
+                      {/if}
+                    </td>
+                    <td>
+                      {#if isEditing && editingGuestField === 'party'}
+                        <div class="guest-party-fields guest-party-fields--inline"><label><span>Adults</span><select data-guest-edit="party" bind:value={guestEditForm.adults} onchange={markGuestEditDirty} aria-label="Number of adults">{#each Array(20) as _, optionIndex}<option value={optionIndex + 1}>{optionIndex + 1}</option>{/each}</select></label><label><span>Children</span><select bind:value={guestEditForm.children} onchange={markGuestEditDirty} aria-label="Number of children">{#each Array(11) as _, optionIndex}<option value={optionIndex}>{optionIndex}</option>{/each}</select></label></div>
+                      {:else if isEditing}
+                        <button class="guest-edit-value guest-party-label" type="button" onclick={() => openGuestField('party', guest)}>{partyLabel(guestEditForm)}</button>
+                      {:else}
+                        <button class="guest-edit-value guest-party-label" type="button" onclick={() => openGuestField('party', guest)}>{partyLabel(guest)}</button>
+                      {/if}
+                    </td>
+                    <td>
+                      {#if isEditing && editingGuestField === 'contact'}
+                        <div class="guest-contact guest-contact--inline"><input class="guest-inline-editor" data-guest-edit="contact" bind:value={guestEditForm.email} oninput={markGuestEditDirty} type="email" aria-label="Guest email" placeholder="Email" /><input class="guest-inline-editor" bind:value={guestEditForm.phone} oninput={markGuestEditDirty} type="tel" aria-label="Guest phone" placeholder="Phone" /></div>
+                      {:else if isEditing}
+                        <button class="guest-edit-value" type="button" onclick={() => openGuestField('contact', guest)}>{[guestEditForm.email, guestEditForm.phone].filter(Boolean).join(', ') || 'No contact details'}</button>
+                      {:else}
+                        <button class="guest-edit-value" type="button" onclick={() => openGuestField('contact', guest)}>{[guest.email, guest.phone].filter(Boolean).join(', ') || 'No contact details'}</button>
+                      {/if}
+                    </td>
+                    <td>
+                      {#if isEditing && editingGuestField === 'meal'}
+                        <input class="guest-inline-editor" data-guest-edit="meal" bind:value={guestEditForm.meal} oninput={markGuestEditDirty} aria-label="Guest note" placeholder="Not provided" />
+                      {:else if isEditing}
+                        <button class="guest-edit-value" type="button" onclick={() => openGuestField('meal', guest)}>{guestEditForm.meal || 'Not provided'}</button>
+                      {:else}
+                        <button class="guest-edit-value guest-note-text" type="button" onclick={() => openGuestField('meal', guest)}>{guest.meal || 'Not provided'}</button>
+                      {/if}
+                    </td>
+                    <td>
+                      {#if isEditing}
+                        <select class={`status-select status-select--${guestEditForm.status}`} bind:value={guestEditForm.status} onchange={markGuestEditDirty} aria-label={`Attendance status for ${guest.name}`}><option value="attending">Attending</option><option value="pending">Pending</option><option value="declined">Declined</option></select>
+                      {:else}
+                        <select class={`status-select status-select--${guest.status}`} value={guest.status} onchange={(event) => changeGuestStatus(guest, event.currentTarget.value)} aria-label={`Attendance status for ${guest.name}`}><option value="attending">Attending</option><option value="pending">Pending</option><option value="declined">Declined</option></select>
+                      {/if}
+                    </td>
+                    <td class="guest-row-action-cell">
+                      {#if isEditing && guestEditDirty}
+                        <div class="inline-row-actions guest-row-actions"><button class="guest-save-button" type="button" onclick={saveGuestEdit} aria-label="Save guest changes" title="Save changes">Save</button><button class="guest-cancel-button" type="button" onclick={cancelGuestEdit} aria-label="Cancel editing" title="Cancel">×</button></div>
+                      {:else}
                         <div class="guest-action-menu">
                           <button class="guest-menu-trigger" type="button" onclick={() => toggleGuestMenu(guest.id)} aria-label={`Actions for ${guest.name}`} aria-haspopup="menu" aria-expanded={openGuestMenuId === guest.id}>
                             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="12" cy="19" r="1.6" /></svg>
                           </button>
                           {#if openGuestMenuId === guest.id}
                             <div class:opens-up={index >= sortedGuests.length - 2} class="guest-menu-popover" role="menu">
-                              <button type="button" role="menuitem" onclick={() => startEditingGuest(guest)}>
-                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.9-10.9a2.1 2.1 0 0 0-3-3L5.2 16 4 20Z" /><path d="m14.8 6.3 2.9 2.9" /></svg>
-                                Edit
-                              </button>
                               <button class="danger" type="button" role="menuitem" onclick={() => { openGuestMenuId = ''; guestToDelete = guest }}>
                                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg>
                                 Delete
@@ -454,9 +552,9 @@
                             </div>
                           {/if}
                         </div>
-                      </td>
-                    </tr>
-                  {/if}
+                      {/if}
+                    </td>
+                  </tr>
                 {/each}
               </tbody>
             </table>
@@ -475,7 +573,7 @@
           {#if unassignedGuests.length > 0}
             <section class="unassigned-pool" role="group" aria-label="Unassigned guests" ondragover={(event) => event.preventDefault()} ondrop={() => dropGuest('')}>
               <div><span>Unassigned guests</span><small>Drag each guest to a table</small></div>
-              <div>{#each unassignedGuests as guest}<button draggable="true" ondragstart={() => (draggedGuestId = guest.id)} type="button"><i>{guest.name.slice(0, 1)}</i>{guest.name}<b>{guest.party}</b></button>{/each}</div>
+              <div>{#each unassignedGuests as guest}<button draggable="true" ondragstart={() => (draggedGuestId = guest.id)} type="button"><i class={avatarTone(guest.id || guest.name)}>{guest.name.slice(0, 1)}</i>{guest.name}<b>{guest.party}</b></button>{/each}</div>
             </section>
           {/if}
 
@@ -487,22 +585,10 @@
                 <header><span>0{tableIndex + 1}</span><div><input value={table.name} onchange={(event) => (data = { ...data, tables: data.tables.map((item) => item.id === table.id ? { ...item, name: event.currentTarget.value } : item) })} aria-label="Table name" /><small>{occupied} of {table.capacity} seats</small></div><button type="button" onclick={() => removeTable(table.id)} aria-label={`Remove ${table.name}`}>×</button></header>
                 <div class="seating-table__visual"><div><strong>{table.name}</strong><span>{table.capacity} seats</span></div>{#each Array(table.capacity) as _, seat}<i class:filled={seat < occupied}></i>{/each}</div>
                 <div class="seating-table__guests">
-                  {#each seated as guest}<button draggable="true" ondragstart={() => (draggedGuestId = guest.id)} type="button"><i>{guest.name.slice(0, 1)}</i><span>{guest.name}<small>Party of {guest.party}</small></span><b>⋮⋮</b></button>{/each}
+                  {#each seated as guest}<button draggable="true" ondragstart={() => (draggedGuestId = guest.id)} type="button"><i class={avatarTone(guest.id || guest.name)}>{guest.name.slice(0, 1)}</i><span>{guest.name}<small>Party of {guest.party}</small></span><b>⋮⋮</b></button>{/each}
                   {#if seated.length === 0}<p>Drop guests here</p>{/if}
                 </div>
               </article>
-            {/each}
-          </div>
-        </section>
-
-      {:else if active === 'rsvps'}
-        <section class="dashboard-view" aria-labelledby="rsvp-heading">
-          <header class="dashboard-page-heading"><div><p class="dashboard-eyebrow">Responses</p><h1 id="rsvp-heading">Manage RSVPs</h1><p>See who is coming and follow up with anyone yet to reply.</p></div><button class="dashboard-secondary" type="button" onclick={() => onNotify('Reminder emails queued in demo mode.')}>Send reminders</button></header>
-          <div class="rsvp-stat-grid"><button class:active={rsvpFilter === 'all'} onclick={() => (rsvpFilter = 'all')} type="button"><span>All guests</span><strong>{summary.total}</strong></button><button class:active={rsvpFilter === 'attending'} onclick={() => (rsvpFilter = 'attending')} type="button"><span>Attending</span><strong>{summary.attending}</strong></button><button class:active={rsvpFilter === 'pending'} onclick={() => (rsvpFilter = 'pending')} type="button"><span>Awaiting reply</span><strong>{summary.pending}</strong></button><button class:active={rsvpFilter === 'declined'} onclick={() => (rsvpFilter = 'declined')} type="button"><span>Declined</span><strong>{summary.declined}</strong></button></div>
-          <div class="dashboard-toolbar"><label class="dashboard-search"><span>⌕</span><input bind:value={guestSearch} placeholder="Search responses" /></label><span>Updates save automatically</span></div>
-          <div class="rsvp-list">
-            {#each filteredGuests as guest}
-              <article><i>{guest.name.slice(0, 1)}</i><div><strong>{guest.name}</strong><span>{guest.email || 'No email yet'} · Party of {guest.party}</span></div><label><span>Meal note</span><input value={guest.meal} onchange={(event) => updateGuest(guest.id, { meal: event.currentTarget.value })} placeholder="Not provided" /></label><select class={`status-select status-select--${guest.status}`} value={guest.status} onchange={(event) => updateGuest(guest.id, { status: event.currentTarget.value })}><option value="attending">Attending</option><option value="pending">Pending</option><option value="declined">Declined</option></select></article>
             {/each}
           </div>
         </section>
@@ -536,7 +622,7 @@
                     <td><div class="inline-row-actions"><button type="button" onclick={addGift}>Save</button><button type="button" onclick={() => (showGiftForm = false)}>Cancel</button></div></td>
                   </tr>
                 {/if}
-                {#each data.gifts as gift}<tr class:thanked={gift.thanked}><td><i>{gift.guest.slice(0, 1)}</i><span><strong>{gift.guest}</strong><small>{gift.guestId ? 'Guest list' : 'Not on guest list'}</small></span></td><td><span class={`gift-type gift-type--${gift.type}`}>{gift.type === 'money' ? 'Money' : 'Item'}</span></td><td><strong class="gift-value">{giftLabel(gift)}</strong></td><td><span class="gift-note">{gift.note || 'No note added'}</span></td><td><button class="gift-thank-toggle" class:active={gift.thanked} type="button" onclick={() => toggleThanked(gift.id)} aria-pressed={gift.thanked}><i>{gift.thanked ? '✓' : ''}</i>{gift.thanked ? 'Thanked' : 'Pending'}</button></td><td><button class="dashboard-row-remove" type="button" onclick={() => removeGift(gift.id)} aria-label={`Remove gift from ${gift.guest}`}>×</button></td></tr>{/each}
+                {#each data.gifts as gift}<tr class:thanked={gift.thanked}><td><i class={avatarTone(gift.guestId || gift.guest)}>{gift.guest.slice(0, 1)}</i><span><strong>{gift.guest}</strong><small>{gift.guestId ? 'Guest list' : 'Not on guest list'}</small></span></td><td><span class={`gift-type gift-type--${gift.type}`}>{gift.type === 'money' ? 'Money' : 'Item'}</span></td><td><strong class="gift-value">{giftLabel(gift)}</strong></td><td><span class="gift-note">{gift.note || 'No note added'}</span></td><td><button class="gift-thank-toggle" class:active={gift.thanked} type="button" onclick={() => toggleThanked(gift.id)} aria-pressed={gift.thanked}><i>{gift.thanked ? '✓' : ''}</i>{gift.thanked ? 'Thanked' : 'Pending'}</button></td><td><button class="dashboard-row-remove" type="button" onclick={() => removeGift(gift.id)} aria-label={`Remove gift from ${gift.guest}`}>×</button></td></tr>{/each}
               </tbody>
             </table>
           </div>

@@ -56,17 +56,21 @@ export function createDashboardData(site) {
 }
 
 export function createGuest(values) {
+  const adults = Math.max(1, Number(values.adults ?? values.party) || 1)
+  const children = Math.max(0, Number(values.children) || 0)
   return {
     id: id('guest'),
     name: values.name.trim(),
     email: values.email.trim(),
     phone: values.phone?.trim() ?? '',
-    party: Math.max(1, Number(values.party) || 1),
+    adults,
+    children,
+    party: adults + children,
     status: values.status || 'pending',
     attended: null,
     note: values.note?.trim() ?? '',
     tableId: '',
-    meal: '',
+    meal: values.meal?.trim() ?? '',
   }
 }
 
