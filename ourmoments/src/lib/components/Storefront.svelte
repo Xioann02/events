@@ -64,7 +64,7 @@
 
   <nav class="desktop-nav" aria-label="Main navigation">
     <a href="#website-includes">Website</a>
-    <a href="?dashboard=overview" onclick={openDashboardLink}>Dashboard</a>
+    <a href="#dashboard-includes">Dashboard</a>
     <a href="#templates">Templates</a>
   </nav>
 
@@ -84,7 +84,7 @@
 <main id="main-content">
   <section class="home-hero" id="top">
     <div class="hero-copy">
-      <h1>Every detail, <em>in one place</em></h1>
+      <h1><span>Every detail,</span><br /><em>in one place</em></h1>
       <div class="hero-support">
         <p class="hero-lede">
           Create your invitation, collect RSVPs and share every event detail—all with one link.
