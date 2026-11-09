@@ -1,4 +1,42 @@
 import { formatEventDate, formatTime, getOccasion } from './catalog.js'
+import { normalizeCoverPosition, normalizeCoverZoom } from './draft.js'
+import modernCoupleSample from '../assets/modern-couple.jpg'
+import receptionTableSample from '../assets/reception-table.jpg'
+import invitationDetailSample from '../assets/editorial-still-life.jpg'
+import celebrationSparklerSample from '../assets/sparkler-hero.jpg'
+
+const gallerySamples = {
+  wedding: [
+    [modernCoupleSample, 'A couple walking together'],
+    [receptionTableSample, 'A celebration table prepared for dinner'],
+    [invitationDetailSample, 'Invitation stationery and celebration details'],
+  ],
+  birthday: [
+    [celebrationSparklerSample, 'A sparkler glowing at a celebration'],
+    [receptionTableSample, 'A dinner table set for a celebration'],
+    [invitationDetailSample, 'A celebration invitation detail'],
+  ],
+  'baby-shower': [
+    [invitationDetailSample, 'A soft-toned invitation and floral detail'],
+    [receptionTableSample, 'A table set for a family gathering'],
+    [modernCoupleSample, 'A family celebrating together'],
+  ],
+  engagement: [
+    [modernCoupleSample, 'A couple walking together'],
+    [celebrationSparklerSample, 'A sparkler glowing at a celebration'],
+    [invitationDetailSample, 'Invitation stationery for a celebration'],
+  ],
+  graduation: [
+    [celebrationSparklerSample, 'A sparkler at a milestone celebration'],
+    [receptionTableSample, 'A table set for a graduation gathering'],
+    [modernCoupleSample, 'Friends celebrating a milestone together'],
+  ],
+  dinner: [
+    [receptionTableSample, 'A dinner table prepared for guests'],
+    [invitationDetailSample, 'A place setting and paper detail'],
+    [celebrationSparklerSample, 'Warm lights at an evening gathering'],
+  ],
+}
 
 const managedSectionSelectors = {
   story: '.invitation-section',
@@ -179,6 +217,103 @@ function patchHero(document, draft, templateId) {
   setText('.date-medallion > span', date.month, document)
   setText('.date-medallion > strong', date.day, document)
   setText('.date-medallion > small', date.year, document)
+
+  const heroPhoto = document.querySelector('.hero-photo img')
+  if (heroPhoto) {
+    if (!heroPhoto.dataset.ourmomentsDefaultSrc) {
+      heroPhoto.dataset.ourmomentsDefaultSrc = heroPhoto.getAttribute('src') ?? ''
+      heroPhoto.dataset.ourmomentsDefaultObjectPosition = document.defaultView
+        .getComputedStyle(heroPhoto)
+        .objectPosition
+    }
+    const coverSrc = draft.images?.cover || heroPhoto.dataset.ourmomentsDefaultSrc
+    if (heroPhoto.getAttribute('src') !== coverSrc) heroPhoto.setAttribute('src', coverSrc)
+    const figure = heroPhoto.closest('.hero-photo')
+    const hasUploadedCover = Boolean(draft.images?.cover)
+    const coverPosition = normalizeCoverPosition(draft.images?.coverPosition)
+    const coverZoom = normalizeCoverZoom(draft.images?.coverZoom)
+    heroPhoto.style.objectPosition = hasUploadedCover
+      ? `${coverPosition.x}% ${coverPosition.y}%`
+      : heroPhoto.dataset.ourmomentsDefaultObjectPosition
+    heroPhoto.classList.toggle('ourmoments-draggable', hasUploadedCover)
+    figure?.classList.toggle('ourmoments-custom-cover', hasUploadedCover)
+    if (hasUploadedCover) {
+      figure?.style.setProperty('--ourmoments-cover-image', `url("${coverSrc}")`)
+      heroPhoto.style.setProperty('--ourmoments-cover-zoom', String(coverZoom))
+    } else {
+      figure?.style.removeProperty('--ourmoments-cover-image')
+      heroPhoto.style.removeProperty('--ourmoments-cover-zoom')
+    }
+    attachCoverPhotoDrag(heroPhoto)
+  }
+}
+
+function attachCoverPhotoDrag(image) {
+  if (image.dataset.ourmomentsDragReady) return
+  image.dataset.ourmomentsDragReady = 'true'
+
+  const figure = image.closest('.hero-photo')
+  if (!figure) return
+  if (!image.ownerDocument.getElementById('ourmoments-cover-drag-style')) {
+    const style = image.ownerDocument.createElement('style')
+    style.id = 'ourmoments-cover-drag-style'
+    style.textContent = `
+      .hero-photo.ourmoments-custom-cover { isolation: isolate; }
+      .hero-photo.ourmoments-custom-cover::before {
+        content: ''; position: absolute; z-index: 0; inset: -12px; pointer-events: none;
+        background: var(--ourmoments-cover-image) center / cover no-repeat;
+        filter: blur(14px) brightness(.78); transform: scale(1.05);
+      }
+      .hero-photo img.ourmoments-draggable {
+        position: relative; z-index: 1; object-fit: contain !important;
+        transform: scale(var(--ourmoments-cover-zoom, 1)) !important;
+        transform-origin: center; cursor: grab; touch-action: none;
+      }
+      .hero-photo:has(img.ourmoments-draggable):active img { cursor: grabbing; }
+    `
+    image.ownerDocument.head.append(style)
+  }
+
+  let drag = null
+  figure.addEventListener('pointerdown', (event) => {
+    if (event.target !== image || !image.classList.contains('ourmoments-draggable') || event.button !== 0) return
+    const position = image.style.objectPosition.match(/([\d.]+)%\s+([\d.]+)%/)
+    drag = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      x: Number(position?.[1] ?? 50),
+      y: Number(position?.[2] ?? 50),
+    }
+    figure.setPointerCapture(event.pointerId)
+    event.preventDefault()
+  })
+
+  figure.addEventListener('pointermove', (event) => {
+    if (!drag || drag.pointerId !== event.pointerId) return
+    const bounds = image.getBoundingClientRect()
+    const zoom = normalizeCoverZoom(image.style.getPropertyValue('--ourmoments-cover-zoom'))
+    const scale = Math.min(bounds.width / image.naturalWidth, bounds.height / image.naturalHeight) * zoom
+    const overflowX = bounds.width - image.naturalWidth * scale
+    const overflowY = bounds.height - image.naturalHeight * scale
+    const position = normalizeCoverPosition({
+      x: drag.x + (overflowX ? ((event.clientX - drag.startX) / overflowX) * 100 : 0),
+      y: drag.y + (overflowY ? ((event.clientY - drag.startY) / overflowY) * 100 : 0),
+    })
+    image.style.objectPosition = `${position.x}% ${position.y}%`
+  })
+
+  function finishDrag(event) {
+    if (!drag || drag.pointerId !== event.pointerId) return
+    drag = null
+    const position = image.style.objectPosition.match(/([\d.]+)%\s+([\d.]+)%/)
+    window.dispatchEvent(new CustomEvent('ourmoments:cover-position', {
+      detail: normalizeCoverPosition({ x: position?.[1], y: position?.[2] }),
+    }))
+  }
+
+  figure.addEventListener('pointerup', finishDrag)
+  figure.addEventListener('pointercancel', finishDrag)
 }
 
 function patchInvitation(document, draft, occasion) {
@@ -265,10 +400,25 @@ function patchFaq(document, draft, occasion) {
 function patchGallery(document, draft, occasion) {
   setText('.gallery-heading > .eyebrow', occasion.sectionLabels.gallery, document)
   setText('#gallery-title', draft.galleryTitle, document)
-  setText('.gallery-heading > p:last-child', draft.galleryBody, document)
+  setText(
+    '.gallery-heading > p:last-child',
+    `${draft.galleryBody} Sample template photos are shown here; guests can add their photos after publishing is available.`,
+    document,
+  )
   for (const element of document.querySelectorAll('.slideshow, .slide-dots')) {
     element.setAttribute('aria-label', draft.galleryTitle)
   }
+
+  const galleryImages = [...document.querySelectorAll('.slideshow-frame > img')]
+  const samples = gallerySamples[draft.occasionId] ?? gallerySamples.wedding
+  galleryImages.forEach((image, index) => {
+    if (!image.dataset.ourmomentsDefaultSrc) {
+      image.dataset.ourmomentsDefaultSrc = image.getAttribute('src') ?? ''
+    }
+    const [gallerySrc, alt] = samples[index % samples.length]
+    if (image.getAttribute('src') !== gallerySrc) image.setAttribute('src', gallerySrc)
+    if (image.getAttribute('alt') !== alt) image.setAttribute('alt', alt)
+  })
 }
 
 function patchFooter(document, draft) {

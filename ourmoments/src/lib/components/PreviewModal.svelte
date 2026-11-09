@@ -62,8 +62,8 @@
     </div>
 
     <footer class="preview-modal__footer">
-      <p><strong>{template.name}</strong><span>{template.personality} · €{template.price}</span></p>
-      <button class="button button--dark" type="button" onclick={onCustomize}>Create your invitation <span aria-hidden="true">→</span></button>
+      <p><strong>{template.name}</strong><span>{template.personality}</span></p>
+      <button class="button button--dark" type="button" onclick={onCustomize}>Use this design <span aria-hidden="true">→</span></button>
     </footer>
   </div>
 </div>

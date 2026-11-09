@@ -3,6 +3,7 @@
   import LogoMark from './LogoMark.svelte'
   import ExactTemplateFrame from './ExactTemplateFrame.svelte'
   import HeroFeatureScene from './HeroFeatureScene.svelte'
+  import PlansPage from './PlansPage.svelte'
 
   const websiteFeatures = [
     { title: 'Event information', detail: 'Keep every date, time and venue detail together.' },
@@ -24,26 +25,27 @@
 
   let {
     selectedOccasionId,
-    cartCount = 0,
     onCustomize,
     onPreview,
-    onAddToCart,
-    onOpenCart,
-    dashboardAvailable = false,
-    onDashboardAccess,
     onAccountAccess,
+    onBuyPlan,
   } = $props()
 
   let selectedOccasion = $derived(getOccasion(selectedOccasionId))
+  let templateTrack
 
   function scrollToTemplates() {
     document.getElementById('templates')?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  function openDashboardLink(event) {
-    event.preventDefault()
-    onDashboardAccess()
+  function scrollTemplates(direction) {
+    if (!templateTrack) return
+    templateTrack.scrollBy({
+      left: direction * templateTrack.clientWidth * 0.82,
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    })
   }
+
 </script>
 
 <a class="skip-link" href="#main-content">Skip to content</a>
@@ -63,20 +65,11 @@
   </a>
 
   <nav class="desktop-nav" aria-label="Main navigation">
-    <a href="#website-includes">Website</a>
-    <a href="#dashboard-includes">Dashboard</a>
     <a href="#templates">Templates</a>
+    <a href="#plans">Plans</a>
   </nav>
 
   <div class="header-actions">
-    <button class="cart-button" type="button" onclick={onOpenCart} aria-label={`Open cart, ${cartCount} items`}>
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M6.5 8.5h11l-.6 11h-9.8l-.6-11Z" />
-        <path d="M9 9V7a3 3 0 0 1 6 0v2" />
-      </svg>
-      <span>Cart</span>
-      <i>{cartCount}</i>
-    </button>
     <button class="header-cta" type="button" onclick={onAccountAccess}>My account</button>
   </div>
 </header>
@@ -84,10 +77,11 @@
 <main id="main-content">
   <section class="home-hero" id="top">
     <div class="hero-copy">
+      <p class="hero-overline"><span></span> Your event, beautifully together</p>
       <h1><span>Every detail,</span><br /><em>in one place</em></h1>
       <div class="hero-support">
         <p class="hero-lede">
-          Create your invitation, collect RSVPs and share every event detail—all with one link.
+          Your invitation, event details, and guest planning in one thoughtful place.
         </p>
         <div class="hero-actions">
           <button class="button button--dark button--large" type="button" onclick={scrollToTemplates}>
@@ -108,9 +102,9 @@
     <div class="section-shell feature-layout">
       <header class="feature-intro">
         <p class="overline"><span></span> What your website includes</p>
-        <h2 id="website-includes-heading">Everything guests need,<br /><em>in one place.</em></h2>
+        <h2 id="website-includes-heading">Your event website,<br /><em>all in one place.</em></h2>
         <p>
-          A beautiful, shareable home for your celebration—easy for you to update and effortless for every guest to use.
+          A beautiful, shareable website with your invitation, schedule, RSVPs, and event details together in one link.
         </p>
       </header>
 
@@ -129,8 +123,8 @@
     <div class="section-shell feature-layout feature-layout--dashboard">
       <header class="feature-intro">
         <p class="overline"><span></span> What your dashboard includes</p>
-        <h2 id="dashboard-includes-heading">Your celebration,<br /><em>beautifully organised.</em></h2>
-        <p>One clear dashboard for the practical details, from the first reply to the final photo.</p>
+        <h2 id="dashboard-includes-heading">Your event planning platform,<br /><em>beautifully organised.</em></h2>
+        <p>Manage RSVPs, guest lists, seating, gifts, and shared photos in one private planning space.</p>
       </header>
 
       <ol class="feature-index feature-index--compact">
@@ -151,14 +145,17 @@
           <p class="overline overline--light"><span></span> The collection</p>
           <h2 id="template-heading">Find a look that<br /><em>feels like you.</em></h2>
         </div>
-        <div class="collection-note">
-          <span>Personalise inside the editor</span>
-          <strong>Occasion, copy & details</strong>
-          <small>All included</small>
+        <div class="template-carousel-controls" aria-label="Template carousel controls">
+          <button type="button" onclick={() => scrollTemplates(-1)} aria-label="Show previous templates">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+          </button>
+          <button type="button" onclick={() => scrollTemplates(1)} aria-label="Show more templates">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
+          </button>
         </div>
       </div>
 
-      <div class="template-grid">
+      <div class="template-grid" bind:this={templateTrack} role="region" aria-label="Invitation templates">
         {#each templates as template, index}
           <article class="template-card">
             <div class="template-card__preview">
@@ -189,25 +186,11 @@
                   <h3>{template.name}</h3>
                   <p>{template.personality}</p>
                 </div>
-                <strong>€{template.price}</strong>
               </div>
               <p class="template-description">{template.description}</p>
               <div class="template-actions">
                 <button class="button button--cream" type="button" onclick={() => onCustomize(template.id)}>
-                  Create your invitation <span aria-hidden="true">→</span>
-                </button>
-                <button
-                  class="icon-button icon-button--light"
-                  type="button"
-                  onclick={() => onAddToCart(template.id)}
-                  aria-label={`Add ${template.name} template to cart`}
-                  title="Add to cart"
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M6.5 8.5h11l-.6 11h-9.8l-.6-11Z" />
-                    <path d="M9 9V7a3 3 0 0 1 6 0v2" />
-                    <path d="M12 11v5m-2.5-2.5h5" />
-                  </svg>
+                  Use this design <span aria-hidden="true">→</span>
                 </button>
               </div>
             </div>
@@ -222,7 +205,7 @@
       <div class="how-copy">
         <p class="overline"><span></span> Simple by design</p>
         <h2 id="how-heading">From idea to invite<br />in three easy steps.</h2>
-        <p>No design degree. No endless settings. Just the useful things, exactly where you expect them.</p>
+        <p>Create your invitation, share it with your guests, then choose the plan that fits your event.</p>
         <button class="button button--dark" type="button" onclick={scrollToTemplates}>
           Create your invitation <span aria-hidden="true">↗</span>
         </button>
@@ -231,24 +214,26 @@
       <ol class="steps-list">
         <li>
           <span>01</span>
-          <div><strong>Choose your design</strong><p>Start with the visual style that feels most like your celebration.</p></div>
+          <div><strong>Create your invitation</strong><p>Choose a design, add your event details, and see your invitation take shape.</p></div>
           <i aria-hidden="true">✦</i>
         </li>
         <li>
           <span>02</span>
-          <div><strong>Set the occasion & details</strong><p>Choose your occasion in the editor, then add the details while the page updates beside you.</p></div>
+          <div><strong>Share</strong><p>Send your guests one simple link to your invitation and all the important event details.</p></div>
           <i aria-hidden="true">⌁</i>
         </li>
         <li>
           <span>03</span>
-          <div><strong>Add it to your cart</strong><p>Review your finished design. Secure checkout and publishing are coming next.</p></div>
+          <div><strong>Start planning your event</strong><p>Track RSVPs, organize your guest list, and arrange seating—all in one place.</p></div>
           <i aria-hidden="true">↗</i>
         </li>
       </ol>
     </div>
   </section>
 
-  <section class="closing-banner">
+  <PlansPage {onBuyPlan} />
+
+  <!--<section class="closing-banner">
     <div class="closing-shape closing-shape--one" aria-hidden="true"></div>
     <div class="closing-shape closing-shape--two" aria-hidden="true"></div>
     <p class="overline"><span></span> A little corner of the internet, just for you</p>
@@ -256,7 +241,7 @@
     <button class="button button--dark button--large" type="button" onclick={scrollToTemplates}>
       Create your invitation <span aria-hidden="true">↗</span>
     </button>
-  </section>
+  </section>-->
 </main>
 
 <footer class="site-footer">
@@ -265,5 +250,5 @@
     <span>ourmoments<span>.io</span></span>
   </div>
   <p>Beautifully simple invitations for the days worth remembering.</p>
-  <div class="footer-links"><a href="#website-includes">Website</a><a href="?dashboard=overview" onclick={openDashboardLink}>Dashboard</a><a href="#templates">Templates</a><span>© 2026</span></div>
+  <div class="footer-links"><a href="#templates">Templates</a><a href="#plans">Plans</a><span>© 2026</span></div>
 </footer>

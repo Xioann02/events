@@ -876,9 +876,8 @@ p {
 }
 
 .how-copy {
-  position: sticky;
-  top: 125px;
-  height: max-content;
+  position: static;
+  height: auto;
 }
 
 .how-copy > p:not(.overline) {
@@ -1507,6 +1506,74 @@ p {
 .repeat-card textarea:focus {
   border-color: var(--terracotta-deep);
   box-shadow: 0 0 0 3px rgba(189, 101, 72, 0.1);
+}
+
+.photo-customization {
+  display: grid;
+  gap: 14px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(39, 35, 31, 0.12);
+}
+
+.photo-customization__intro {
+  display: grid;
+  gap: 4px;
+}
+
+.photo-customization__intro strong {
+  color: var(--ink);
+  font-size: 0.8rem;
+}
+
+.photo-customization__intro > span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.image-upload-field input[type='file'] {
+  min-height: 42px;
+  padding: 8px;
+  font-size: 0.7rem;
+}
+
+.image-upload-field input[type='file']::file-selector-button {
+  min-height: 26px;
+  margin-right: 8px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--ink);
+  background: #eee9e1;
+  font: inherit;
+  font-weight: 600;
+}
+
+.photo-reset {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  color: var(--muted);
+  background: transparent;
+  font-size: 0.7rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.photo-upload-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.photo-position-control {
+  gap: 5px;
+}
+
+.photo-position-control input[type='range'] {
+  min-height: 24px;
+  padding: 0;
+  accent-color: var(--terracotta-deep);
 }
 
 .field > small {

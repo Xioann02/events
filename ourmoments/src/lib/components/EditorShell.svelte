@@ -23,7 +23,7 @@
 
   let occasion = $derived(getOccasion(draft.occasionId))
   let template = $derived(getTemplate(draft.templateId))
-  let primaryLabel = $derived(primaryActionLabel || `Add to cart · €${template.price}`)
+  let primaryLabel = $derived(primaryActionLabel || 'Choose a plan')
   let hiddenSections = $derived(sectionOrder.filter((sectionId) => !draft.sections[sectionId]))
 
   function announce(message) {
@@ -49,6 +49,67 @@
   function chooseTemplate(templateId) {
     draft.templateId = templateId
     onTemplateChange(templateId)
+  }
+
+  async function optimizePhoto(file) {
+    if (!file.type.startsWith('image/') || file.size > 12 * 1024 * 1024) {
+      throw new Error('Choose an image smaller than 12 MB.')
+    }
+
+    const bitmap = await createImageBitmap(file)
+    const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(bitmap.width * scale)
+    canvas.height = Math.round(bitmap.height * scale)
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+    bitmap.close()
+
+    let dataUrl = canvas.toDataURL('image/webp', 0.78)
+    if (dataUrl.length > 900_000) dataUrl = canvas.toDataURL('image/webp', 0.56)
+    if (dataUrl.length > 900_000) throw new Error('This image is too large after compression. Choose a smaller image.')
+    return dataUrl
+  }
+
+  async function uploadPhoto(slot, event) {
+    const input = event.currentTarget
+    const file = input.files?.[0]
+    if (!file) return
+
+    try {
+      const dataUrl = await optimizePhoto(file)
+      draft.images.cover = dataUrl
+      draft.images.coverPosition = { x: 50, y: 50 }
+      draft.images.coverZoom = 1
+      announce('Photo updated in your invitation preview.')
+    } catch (error) {
+      announce(error instanceof Error ? error.message : 'That photo could not be uploaded.')
+    } finally {
+      input.value = ''
+    }
+  }
+
+  function removePhoto() {
+    draft.images.cover = ''
+    draft.images.coverPosition = { x: 50, y: 50 }
+    draft.images.coverZoom = 1
+    announce('The template photo has been restored.')
+  }
+
+  function centerCoverPhoto() {
+    draft.images.coverPosition = { x: 50, y: 50 }
+    announce('Cover photo centered.')
+  }
+
+  function setCoverPosition(axis, event) {
+    draft.images.coverPosition[axis] = Number(event.currentTarget.value)
+  }
+
+  function setCoverZoom(event) {
+    draft.images.coverZoom = Number(event.currentTarget.value)
+  }
+
+  function saveCoverPosition(position) {
+    draft.images.coverPosition = position
   }
 
   function addScheduleItem() {
@@ -179,6 +240,37 @@
               <span>Small introduction</span>
               <input bind:value={draft.eyebrow} maxlength="80" />
             </label>
+
+            <section class="photo-customization" aria-labelledby="photo-customization-heading">
+              <div class="photo-customization__intro">
+                <strong id="photo-customization-heading">Template photos</strong>
+                <span>Replace the cover photo; gallery samples match your occasion.</span>
+              </div>
+              <label class="field image-upload-field">
+                <span>Cover photo</span>
+                <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" onchange={(event) => uploadPhoto('cover', event)} />
+                {#if draft.images.cover}
+                  <span class="photo-position-hint">Drag the photo in the preview to adjust its crop.</span>
+                  <div class="photo-upload-actions">
+                    <button type="button" class="photo-reset" onclick={centerCoverPhoto}>Center photo</button>
+                    <button type="button" class="photo-reset" onclick={removePhoto}>Restore template photo</button>
+                  </div>
+                  <label class="field photo-position-control">
+                    <span>Horizontal position</span>
+                    <input type="range" min="0" max="100" value={draft.images.coverPosition.x} oninput={(event) => setCoverPosition('x', event)} />
+                  </label>
+                  <label class="field photo-position-control">
+                    <span>Vertical position</span>
+                    <input type="range" min="0" max="100" value={draft.images.coverPosition.y} oninput={(event) => setCoverPosition('y', event)} />
+                  </label>
+                  <label class="field photo-position-control">
+                    <span>Photo zoom</span>
+                    <input type="range" min="0.5" max="2" step="0.01" value={draft.images.coverZoom} oninput={setCoverZoom} />
+                  </label>
+                {/if}
+              </label>
+              <p class="editor-note"><span>i</span> Gallery photos are examples. Guests can add real photos after publishing is available.</p>
+            </section>
           </div>
         </details>
 
@@ -349,7 +441,7 @@
 
       <div class="editor-panel__end">
         <span>That is everything.</span>
-        <p>Your invitation is ready when you are.</p>
+        <p>Choose a plan when your invitation is ready.</p>
       </div>
     </aside>
 
@@ -362,7 +454,7 @@
         <p class="preview-help"><span aria-hidden="true">↯</span> Changes appear here instantly</p>
       </div>
       <div class="preview-stage">
-        <PreviewFrame {draft} mode={previewMode} />
+        <PreviewFrame {draft} mode={previewMode} onCoverPositionChange={saveCoverPosition} />
       </div>
     </section>
   </main>

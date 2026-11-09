@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte'
   import { getTemplate } from '../catalog.js'
+  import { getPlan } from '../plans.js'
   import LogoMark from './LogoMark.svelte'
 
   let { items = [], total = 0, existingAccount = null, onClose, onComplete } = $props()
@@ -100,7 +101,7 @@
             <div class="checkout-form-row"><label><span>Expiry</span><input bind:value={payment.expiry} inputmode="numeric" autocomplete="cc-exp" required /></label><label><span>CVC</span><input bind:value={payment.cvc} inputmode="numeric" autocomplete="cc-csc" required /></label></div>
             <label><span>Country or region</span><select bind:value={payment.country}><option>Cyprus</option><option>Greece</option><option>United Kingdom</option><option>United States</option><option>Other</option></select></label>
             {#if error}<p class="checkout-error" role="alert">{error}</p>{/if}
-            <button class="checkout-submit" type="submit" disabled={processing}>{processing ? 'Creating your dashboard…' : `Pay €${total} & create dashboard`}<span>{processing ? '·' : '→'}</span></button>
+            <button class="checkout-submit" type="submit" disabled={processing}>{processing ? 'Preparing your plan…' : `Complete demo purchase · €${total}`}<span>{processing ? '·' : '→'}</span></button>
             <p class="checkout-terms">By completing this order, you agree to the demo terms and privacy notice.</p>
           </form>
         {/if}
@@ -111,10 +112,16 @@
         <div class="checkout-items">
           {#each items as item}
             {@const template = getTemplate(item.templateId)}
-            <article><div class={`cart-item__art cart-item__art--${template.id}`}><span>{item.title}</span><i>{item.occasionName}</i></div><p><strong>{template.name}</strong><span>{item.occasionName} website</span><small>Dashboard included</small></p><b>€{item.price}</b></article>
+            {@const plan = item.planId ? getPlan(item.planId) : null}
+            <article><div class={`cart-item__art cart-item__art--${template.id}`}><span>{plan ? plan.name : item.title}</span><i>{plan ? 'ourmoments.io' : item.occasionName}</i></div><p><strong>{plan ? plan.name : template.name}</strong><span>{plan ? 'One-time plan purchase' : `${item.occasionName} website`}</span><small>{plan ? 'Invitation website and dashboard' : 'Dashboard included'}</small></p><b>€{item.price}</b></article>
           {/each}
         </div>
-        <div class="checkout-included"><span>Included</span><ul><li><i>✓</i> Digital invitation website</li><li><i>✓</i> RSVP & guest management</li><li><i>✓</i> Seating planner</li><li><i>✓</i> Photo & gift tracking</li><li><i>✓</i> Shareable QR code</li></ul></div>
+        {#if items[0]?.planId}
+          {@const plan = getPlan(items[0].planId)}
+          <div class="checkout-included"><span>{plan?.name} includes</span><ul>{#each plan?.features ?? [] as feature}<li><i>✓</i> {feature}</li>{/each}</ul></div>
+        {:else}
+          <div class="checkout-included"><span>Included</span><ul><li><i>✓</i> Digital invitation website</li><li><i>✓</i> RSVP & guest management</li><li><i>✓</i> Seating planner</li><li><i>✓</i> Photo & gift tracking</li><li><i>✓</i> Shareable QR code</li></ul></div>
+        {/if}
         <div class="checkout-total"><span>Total <small>One-time purchase</small></span><strong>€{total}</strong></div>
       </aside>
     </div>

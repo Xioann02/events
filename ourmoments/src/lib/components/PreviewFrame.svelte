@@ -1,7 +1,7 @@
 <script>
   import ExactTemplateFrame from './ExactTemplateFrame.svelte'
 
-  let { draft, mode = 'desktop', showChrome = true } = $props()
+  let { draft, mode = 'desktop', showChrome = true, onCoverPositionChange } = $props()
 
   let subdomain = $derived(
     draft.title
@@ -12,4 +12,4 @@
   )
 </script>
 
-<ExactTemplateFrame {draft} {mode} {showChrome} interactive={true} title={`${draft.title} live invitation preview`} />
+<ExactTemplateFrame {draft} {mode} {showChrome} {onCoverPositionChange} interactive={true} title={`${draft.title} live invitation preview`} />

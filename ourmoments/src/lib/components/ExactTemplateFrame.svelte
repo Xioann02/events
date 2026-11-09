@@ -9,17 +9,20 @@
     interactive = false,
     thumbnail = false,
     title = 'Invitation preview',
+    onCoverPositionChange,
   } = $props()
 
   let frame = $state()
   let viewport = $state()
   let observer
+  let coverPositionListener
   let resizeObserver
   let measuredWidth = $state(0)
   let resizeFrame
   let loaded = $state(false)
   let previousTemplateId = $state('')
   let renderedTemplateId = $derived(draft.templateId)
+  let previewImageInputs = $derived(`${draft.occasionId}:${draft.images?.cover ?? ''}:${draft.images?.coverPosition?.x ?? 50}:${draft.images?.coverPosition?.y ?? 50}:${draft.images?.coverZoom ?? 1}`)
 
   let sourceWidth = $derived(thumbnail ? 1440 : mode === 'mobile' ? 390 : 1440)
   let viewportHeight = $derived(thumbnail ? 1048 : mode === 'mobile' ? 844 : 1100)
@@ -34,6 +37,7 @@
   $effect(() => {
     draft
     renderedTemplateId
+    previewImageInputs
     if (loaded) patchFrame()
   })
 
@@ -54,6 +58,9 @@
       observer = new MutationObserver(() => patchFrame())
       observer.observe(root, { childList: true, characterData: true, subtree: true })
     }
+    if (coverPositionListener) frame?.contentWindow?.removeEventListener('ourmoments:cover-position', coverPositionListener)
+    coverPositionListener = (event) => onCoverPositionChange?.(event.detail)
+    frame?.contentWindow?.addEventListener('ourmoments:cover-position', coverPositionListener)
   }
 
   $effect(() => {
@@ -79,6 +86,7 @@
 
   onDestroy(() => {
     observer?.disconnect()
+    frame?.contentWindow?.removeEventListener('ourmoments:cover-position', coverPositionListener)
     resizeObserver?.disconnect()
     cancelAnimationFrame(resizeFrame)
   })

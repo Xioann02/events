@@ -4,6 +4,25 @@
 
   let canvas
 
+  function roundedPanelShape(width, height, radius) {
+    const shape = new THREE.Shape()
+    const left = -width / 2
+    const right = width / 2
+    const bottom = -height / 2
+    const top = height / 2
+
+    shape.moveTo(left + radius, bottom)
+    shape.lineTo(right - radius, bottom)
+    shape.quadraticCurveTo(right, bottom, right, bottom + radius)
+    shape.lineTo(right, top - radius)
+    shape.quadraticCurveTo(right, top, right - radius, top)
+    shape.lineTo(left + radius, top)
+    shape.quadraticCurveTo(left, top, left, top - radius)
+    shape.lineTo(left, bottom + radius)
+    shape.quadraticCurveTo(left, bottom, left + radius, bottom)
+    return shape
+  }
+
   function makeFeatureTexture(type) {
     const surface = document.createElement('canvas')
     surface.width = 600
@@ -181,23 +200,34 @@
     scene.add(keyLight)
 
     const specs = [
-      { type: 'calendar', x: -1.95, y: 1.0, z: -0.5, scale: 0.65, rotateY: 0.18, rotateZ: -0.14 },
-      { type: 'gallery', x: 2.0, y: 1.0, z: -0.3, scale: 0.65, rotateY: -0.17, rotateZ: 0.12 },
-      { type: 'invite', x: -0.18, y: 0.05, z: 0.42, scale: 0.86, rotateY: -0.1, rotateZ: -0.055 },
-      { type: 'rsvp', x: 1.45, y: -1.35, z: 1.05, scale: 0.56, rotateY: -0.18, rotateZ: -0.09 },
+      { type: 'calendar', x: -1.85, y: 1.05, z: -0.58, scale: 0.62, rotateY: 0.2, rotateZ: -0.12 },
+      { type: 'gallery', x: 1.92, y: 1.08, z: -0.42, scale: 0.63, rotateY: -0.18, rotateZ: 0.1 },
+      { type: 'invite', x: -0.28, y: 0.02, z: 0.48, scale: 0.88, rotateY: -0.08, rotateZ: -0.035 },
+      { type: 'rsvp', x: 1.42, y: -1.38, z: 1.08, scale: 0.55, rotateY: -0.16, rotateZ: -0.07 },
     ]
 
     const panels = specs.map((spec, index) => {
       const group = new THREE.Group()
       const width = 2.28
       const height = 3.19
-      const bodyGeometry = new THREE.BoxGeometry(width, height, 0.12)
-      const body = new THREE.Mesh(bodyGeometry, new THREE.MeshStandardMaterial({ color: '#e9e4dc', roughness: 0.82 }))
+      const bodyGeometry = new THREE.ExtrudeGeometry(roundedPanelShape(width, height, 0.12), {
+        depth: 0.1,
+        bevelEnabled: true,
+        bevelSegments: 3,
+        steps: 1,
+        bevelSize: 0.025,
+        bevelThickness: 0.02,
+        curveSegments: 10,
+      })
+      const body = new THREE.Mesh(
+        bodyGeometry,
+        new THREE.MeshStandardMaterial({ color: '#f0ece4', roughness: 0.76, metalness: 0.015 }),
+      )
       const face = new THREE.Mesh(
         new THREE.PlaneGeometry(width - 0.08, height - 0.08),
         new THREE.MeshBasicMaterial({ map: makeFeatureTexture(spec.type), toneMapped: false }),
       )
-      face.position.z = 0.07
+      face.position.z = 0.125
       group.add(body, face)
       group.position.set(spec.x, spec.y, spec.z)
       group.rotation.set(-0.035, spec.rotateY, spec.rotateZ)

@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte'
+  import { onMount, tick } from 'svelte'
   import AccountAccess from './lib/components/AccountAccess.svelte'
   import CartDrawer from './lib/components/CartDrawer.svelte'
   import CheckoutAccount from './lib/components/CheckoutAccount.svelte'
@@ -8,7 +8,8 @@
   import PreviewModal from './lib/components/PreviewModal.svelte'
   import Storefront from './lib/components/Storefront.svelte'
   import { createDashboardData } from './lib/dashboard-data.js'
-  import { cartTotal, createCartItem, createDraft, adaptDraftToOccasion, addOrReplaceCartItem } from './lib/draft.js'
+  import { getPlan } from './lib/plans.js'
+  import { cartTotal, createCartItem, createDraft, createPlanCartItem, adaptDraftToOccasion } from './lib/draft.js'
 
   let screen = $state('home')
   let selectedOccasionId = $state('wedding')
@@ -90,6 +91,14 @@
     const params = new URLSearchParams(window.location.search)
     const templateId = params.get('editor')
 
+    if (params.has('plans')) {
+      editingPurchased = false
+      screen = 'home'
+      window.history.replaceState({}, '', `${window.location.pathname}#plans`)
+      requestAnimationFrame(() => document.getElementById('plans')?.scrollIntoView())
+      return
+    }
+
     if (params.has('dashboard') && account && purchasedSites[0] && dashboardData) {
       editingPurchased = false
       screen = 'dashboard'
@@ -118,6 +127,22 @@
     screen = 'editor'
     if (updateHistory) window.history.pushState({}, '', `?editor=${draft.templateId}&occasion=${draft.occasionId}`)
     window.scrollTo({ top: 0 })
+  }
+
+  function purchasePlan(planId) {
+    const plan = getPlan(planId)
+    if (!plan) return
+    cartItems = [createPlanCartItem(plan, draft)]
+    checkoutOpen = true
+    window.scrollTo({ top: 0 })
+  }
+
+  async function openPlans() {
+    cartOpen = false
+    screen = 'home'
+    window.history.pushState({}, '', `${window.location.pathname}#plans`)
+    await tick()
+    document.getElementById('plans')?.scrollIntoView({ behavior: 'smooth' })
   }
 
   function returnHome() {
@@ -180,24 +205,15 @@
     previewDraft = createDraft(selectedOccasionId, templateId)
   }
 
-  function addTemplateToCart(templateId) {
-    const candidate = createDraft(selectedOccasionId, templateId)
-    const existing = cartItems.find((item) => item.templateId === templateId && item.occasionId === selectedOccasionId)
-    if (existing) candidate.id = existing.id
-    cartItems = addOrReplaceCartItem(cartItems, createCartItem(candidate))
-    notify(existing ? 'That design was updated in your cart.' : 'Template added to your cart.')
-    cartOpen = true
-  }
-
-  function addDraftToCart() {
-    const alreadyThere = cartItems.some((item) => item.id === draft.id)
-    cartItems = addOrReplaceCartItem(cartItems, createCartItem(draft))
-    notify(alreadyThere ? 'Your latest changes are saved in the cart.' : 'Your invitation is in the cart.')
-    cartOpen = true
-  }
-
   function savePurchasedDraft() {
-    const updated = { ...createCartItem(draft), purchasedAt: currentSite.purchasedAt, updatedAt: new Date().toISOString() }
+    const updated = {
+      ...createCartItem(draft),
+      planId: currentSite.planId,
+      planName: currentSite.planName,
+      price: currentSite.price,
+      purchasedAt: currentSite.purchasedAt,
+      updatedAt: new Date().toISOString(),
+    }
     purchasedSites = purchasedSites.map((site, index) => (index === 0 ? updated : site))
     dashboardData = { ...dashboardData, eventName: updated.title }
     notify('Website changes saved.')
@@ -259,11 +275,11 @@
 </svelte:head>
 
 {#if screen === 'home'}
-  <Storefront {selectedOccasionId} cartCount={cartItems.length} dashboardAvailable={hasDashboard} onCustomize={openEditor} onPreview={previewTemplate} onAddToCart={addTemplateToCart} onOpenCart={() => (cartOpen = true)} onDashboardAccess={requestDashboardAccess} onAccountAccess={requestAccountAccess} />
+  <Storefront {selectedOccasionId} onCustomize={openEditor} onPreview={previewTemplate} onAccountAccess={requestAccountAccess} onBuyPlan={purchasePlan} />
 {:else if screen === 'dashboard' && account && currentSite && dashboardData}
   <DashboardShell {account} site={currentSite} bind:data={dashboardData} onHome={returnHome} onEditWebsite={openPurchasedEditor} onNotify={notify} />
 {:else}
-  <EditorShell bind:draft cartCount={cartItems.length} onBack={editingPurchased ? openDashboard : returnHome} onOccasionChange={changeEditorOccasion} onTemplateChange={changeEditorTemplate} onAddToCart={editingPurchased ? savePurchasedDraft : addDraftToCart} onOpenCart={() => (cartOpen = true)} primaryActionLabel={editingPurchased ? 'Save website' : ''} showCart={!editingPurchased} />
+  <EditorShell bind:draft onBack={editingPurchased ? openDashboard : returnHome} onOccasionChange={changeEditorOccasion} onTemplateChange={changeEditorTemplate} onAddToCart={editingPurchased ? savePurchasedDraft : openPlans} primaryActionLabel={editingPurchased ? 'Save website' : 'Choose a plan'} showCart={false} />
 {/if}
 
 {#if previewDraft}
@@ -271,7 +287,7 @@
 {/if}
 
 {#if cartOpen}
-  <CartDrawer items={cartItems} {total} onClose={() => (cartOpen = false)} onRemove={removeCartItem} onEdit={editCartItem} onCheckout={beginCheckout} />
+  <CartDrawer items={cartItems} {total} onClose={() => (cartOpen = false)} onRemove={removeCartItem} onEdit={editCartItem} onCheckout={beginCheckout} onBrowsePlans={openPlans} />
 {/if}
 
 {#if checkoutOpen}

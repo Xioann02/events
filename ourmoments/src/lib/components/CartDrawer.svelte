@@ -1,9 +1,10 @@
 <script>
   import { onMount } from 'svelte'
   import { formatEventDate, getTemplate } from '../catalog.js'
+  import { getPlan } from '../plans.js'
   import LogoMark from './LogoMark.svelte'
 
-  let { items = [], total = 0, onClose, onRemove, onEdit, onCheckout } = $props()
+  let { items = [], total = 0, onClose, onRemove, onEdit, onCheckout, onBrowsePlans } = $props()
   let closeButton
   let dialog
 
@@ -53,24 +54,25 @@
       {#if items.length === 0}
         <div class="empty-cart">
           <LogoMark />
-          <h3>Your cart is waiting for a moment.</h3>
-          <p>Choose a template, add your details and it will appear here.</p>
-          <button class="button button--dark" type="button" onclick={onClose}>Browse templates <span aria-hidden="true">→</span></button>
+          <h3>Your plan selection is waiting.</h3>
+          <p>Choose a plan to continue to checkout.</p>
+          <button class="button button--dark" type="button" onclick={onBrowsePlans}>Browse plans <span aria-hidden="true">→</span></button>
         </div>
       {:else}
         <div class="cart-items">
           {#each items as item}
             {@const template = getTemplate(item.templateId)}
+            {@const plan = item.planId ? getPlan(item.planId) : null}
             <article class="cart-item">
               <div class={`cart-item__art cart-item__art--${template.id}`} aria-hidden="true">
-                <span>{item.title}</span><i>{item.occasionName}</i>
+                <span>{plan ? plan.name : item.title}</span><i>{plan ? 'ourmoments.io' : item.occasionName}</i>
               </div>
               <div class="cart-item__copy">
-                <span>{item.occasionName}</span>
-                <h3>{item.templateName}</h3>
-                <p>{item.title}<br />{formatEventDate(item.date)}</p>
+                <span>{plan ? 'Selected plan' : item.occasionName}</span>
+                <h3>{plan ? plan.name : item.templateName}</h3>
+                <p>{plan ? 'One-time digital invitation plan' : `${item.title}\n${formatEventDate(item.date)}`}</p>
                 <div>
-                  <button type="button" onclick={() => onEdit(item)}>Edit</button>
+                  {#if !plan}<button type="button" onclick={() => onEdit(item)}>Edit</button>{/if}
                   <button type="button" onclick={() => onRemove(item.id)}>Remove</button>
                 </div>
               </div>
