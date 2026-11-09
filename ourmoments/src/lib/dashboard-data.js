@@ -36,6 +36,7 @@ export function createDashboardData(site) {
       { id: 'table-2', name: 'Table 2', capacity: 8 },
       { id: 'table-3', name: 'Table 3', capacity: 6 },
     ],
+    floorPlan: { shapes: [], tableShape: 'round' },
     guests,
     gifts: [
       { id: id('gift'), guestId: guestId('Elena Marin'), guest: 'Elena Marin', type: 'item', amount: '', currency: 'EUR', gift: 'Handmade ceramic serving bowl', note: 'For all the dinners ahead.', thanked: true },

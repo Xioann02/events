@@ -21,12 +21,17 @@
   ]
 
   const photoAssets = { couple: couplePhoto, table: tablePhoto, 'still-life': stillLifePhoto }
+  const MIN_FLOOR_CANVAS_WIDTH = 480
+  const MIN_FLOOR_CANVAS_HEIGHT = 360
 
   let active = $state('overview')
   let mobileNavOpen = $state(false)
   let guestSearch = $state('')
   let guestSort = $state({ key: 'name', direction: 'asc' })
   let guestToDelete = $state(null)
+  let bulkDeleteRequest = $state(null)
+  let selectedGuestIds = $state([])
+  let selectedGiftIds = $state([])
   let openGuestMenuId = $state('')
   let editingGuestId = $state('')
   let editingGuestField = $state('')
@@ -36,6 +41,14 @@
   let showTableForm = $state(false)
   let showGiftForm = $state(false)
   let draggedGuestId = $state('')
+  let seatingView = $state('tables')
+  let floorTool = $state('select')
+  let floorGesture = $state(null)
+  let floorDraft = $state(null)
+  let selectedFloorShapeId = $state('')
+  let openFloorTableId = $state('')
+  let floorTableMoved = false
+  let suppressFloorTableClick = false
   let copied = $state(false)
   let guestForm = $state({ name: '', email: '', phone: '', adults: 1, children: 0, status: 'pending', note: '', meal: '' })
   let guestEditForm = $state({ name: '', email: '', phone: '', adults: 1, children: 0, status: 'pending', note: '', meal: '' })
@@ -44,6 +57,14 @@
 
   let summary = $derived(dashboardSummary(data))
   let template = $derived(getTemplate(site.templateId))
+  let selectedFloorShape = $derived((data.floorPlan?.shapes ?? []).find((shape) => shape.id === selectedFloorShapeId))
+  let floorTableShape = $derived(data.floorPlan?.tableShape === 'rectangle' ? 'rectangle' : 'round')
+  let visibleSelectedGuestIds = $derived(sortedGuests.filter((guest) => selectedGuestIds.includes(guest.id)).map((guest) => guest.id))
+  let allVisibleGuestsSelected = $derived(sortedGuests.length > 0 && visibleSelectedGuestIds.length === sortedGuests.length)
+  let someVisibleGuestsSelected = $derived(visibleSelectedGuestIds.length > 0 && !allVisibleGuestsSelected)
+  let visibleSelectedGiftIds = $derived(data.gifts.filter((gift) => selectedGiftIds.includes(gift.id)).map((gift) => gift.id))
+  let allGiftsSelected = $derived(data.gifts.length > 0 && visibleSelectedGiftIds.length === data.gifts.length)
+  let someGiftsSelected = $derived(visibleSelectedGiftIds.length > 0 && !allGiftsSelected)
   let filteredGuests = $derived(
     data.guests.filter((guest) => {
       const matchesSearch = `${guest.name} ${guest.email}`.toLowerCase().includes(guestSearch.toLowerCase())
@@ -99,9 +120,66 @@
       guests: data.guests.filter((guest) => guest.id !== guestId),
       gifts: data.gifts.map((gift) => (gift.guestId === guestId ? { ...gift, guestId: '' } : gift)),
     }
+    selectedGuestIds = selectedGuestIds.filter((id) => id !== guestId)
     openGuestMenuId = ''
     guestToDelete = null
     onNotify('Guest removed.')
+  }
+
+  function setIndeterminate(node, value) {
+    node.indeterminate = value
+    return { update(nextValue) { node.indeterminate = nextValue } }
+  }
+
+  function toggleGuestSelection(guestId) {
+    selectedGuestIds = selectedGuestIds.includes(guestId)
+      ? selectedGuestIds.filter((id) => id !== guestId)
+      : [...selectedGuestIds, guestId]
+  }
+
+  function selectVisibleGuests(checked) {
+    const visibleIds = new Set(sortedGuests.map((guest) => guest.id))
+    selectedGuestIds = checked
+      ? [...new Set([...selectedGuestIds, ...visibleIds])]
+      : selectedGuestIds.filter((id) => !visibleIds.has(id))
+  }
+
+  function toggleGiftSelection(giftId) {
+    selectedGiftIds = selectedGiftIds.includes(giftId)
+      ? selectedGiftIds.filter((id) => id !== giftId)
+      : [...selectedGiftIds, giftId]
+  }
+
+  function selectAllGifts(checked) {
+    selectedGiftIds = checked
+      ? [...new Set([...selectedGiftIds, ...data.gifts.map((gift) => gift.id)])]
+      : selectedGiftIds.filter((id) => !data.gifts.some((gift) => gift.id === id))
+  }
+
+  function requestBulkDelete(type) {
+    const ids = type === 'guests' ? visibleSelectedGuestIds : visibleSelectedGiftIds
+    if (!ids.length) return
+    bulkDeleteRequest = { type, ids }
+  }
+
+  function confirmBulkDelete() {
+    if (!bulkDeleteRequest) return
+    const { type, ids } = bulkDeleteRequest
+    const deletedIds = new Set(ids)
+    if (type === 'guests') {
+      data = {
+        ...data,
+        guests: data.guests.filter((guest) => !deletedIds.has(guest.id)),
+        gifts: data.gifts.map((gift) => (deletedIds.has(gift.guestId) ? { ...gift, guestId: '' } : gift)),
+      }
+      selectedGuestIds = selectedGuestIds.filter((id) => !deletedIds.has(id))
+      onNotify(`${ids.length} selected ${ids.length === 1 ? 'guest' : 'guests'} removed.`)
+    } else {
+      data = { ...data, gifts: data.gifts.filter((gift) => !deletedIds.has(gift.id)) }
+      selectedGiftIds = selectedGiftIds.filter((id) => !deletedIds.has(id))
+      onNotify(`${ids.length} selected ${ids.length === 1 ? 'gift' : 'gifts'} removed.`)
+    }
+    bulkDeleteRequest = null
   }
 
   function toggleGuestMenu(guestId) {
@@ -197,7 +275,12 @@
 
   function addTable(event) {
     event.preventDefault()
-    const table = createTable(data.tables.length + 1, tableForm.capacity)
+    const tableIndex = data.tables.length
+    const table = {
+      ...createTable(tableIndex + 1, tableForm.capacity),
+      x: 18 + (tableIndex % 4) * 21,
+      y: 22 + Math.floor(tableIndex / 4) * 22,
+    }
     data = { ...data, tables: [...data.tables, table] }
     tableForm = { capacity: 8 }
     showTableForm = false
@@ -221,10 +304,267 @@
     return tableGuests(tableId).reduce((count, guest) => count + guest.party, 0)
   }
 
+  function setFloorTableShape(shape) {
+    data = { ...data, floorPlan: { ...data.floorPlan, tableShape: shape } }
+  }
+
+  function toggleFloorTablePopup(tableId) {
+    if (suppressFloorTableClick) {
+      suppressFloorTableClick = false
+      return
+    }
+    openFloorTableId = openFloorTableId === tableId ? '' : tableId
+  }
+
   function dropGuest(tableId) {
     if (!draggedGuestId) return
     updateGuest(draggedGuestId, { tableId })
     draggedGuestId = ''
+  }
+
+  function floorTablePosition(table, index) {
+    return { x: table.x ?? 18 + (index % 4) * 21, y: table.y ?? 22 + Math.floor(index / 4) * 22 }
+  }
+
+  function seatDotStyle(seat, capacity, shape, view) {
+    const count = Math.max(1, capacity)
+    if (shape !== 'rectangle') {
+      return `--seat-angle:${(seat * 360) / count}deg;--seat-offset:${view === 'list' ? -93 : -45}px`
+    }
+
+    const halfWidth = view === 'list' ? 104 : 61
+    const halfHeight = view === 'list' ? 64 : 34
+    const topCount = Math.ceil(count / 2)
+    const bottomCount = count - topCount
+    const onTopSide = seat < topCount
+    const sideIndex = onTopSide ? seat : seat - topCount
+    const sideCount = onTopSide ? topCount : bottomCount
+    const x = -halfWidth + ((sideIndex + 1) / (sideCount + 1)) * (halfWidth * 2)
+    const y = onTopSide ? -halfHeight : halfHeight
+    return `--seat-x:${x}px;--seat-y:${y}px`
+  }
+
+  function floorCanvasStyle() {
+    const width = data.floorPlan?.width ? `${data.floorPlan.width}px` : '100%'
+    const height = data.floorPlan?.height ?? 520
+    return `--canvas-width:${width};--canvas-height:${height}px`
+  }
+
+  function floorPoint(event) {
+    const canvas = document.querySelector('.floor-canvas')
+    if (!canvas) return null
+    const bounds = canvas.getBoundingClientRect()
+    return {
+      x: Math.max(2, Math.min(98, ((event.clientX - bounds.left) / bounds.width) * 100)),
+      y: Math.max(4, Math.min(96, ((event.clientY - bounds.top) / bounds.height) * 100)),
+      width: bounds.width,
+      height: bounds.height,
+    }
+  }
+
+  function beginFloorGesture(event) {
+    if (active !== 'seating' || seatingView !== 'floor') return
+    const canvas = event.target.closest?.('.floor-canvas')
+    if (!canvas) return
+    const marker = event.target.closest?.('[data-floor-table]')
+    const resizeHandle = event.target.closest?.('[data-floor-resize]')
+    const canvasResizeHandle = event.target.closest?.('[data-floor-canvas-resize]')
+    const shapeNode = event.target.closest?.('[data-floor-shape]')
+    if (canvasResizeHandle) {
+      const bounds = canvas.getBoundingClientRect()
+      floorGesture = { kind: 'canvas-resize', startX: event.clientX, startY: event.clientY, width: bounds.width, height: bounds.height }
+      return
+    }
+    const point = floorPoint(event)
+    if (!point) return
+
+    if (resizeHandle && floorTool === 'select') {
+      const shape = data.floorPlan?.shapes?.find((item) => item.id === resizeHandle.dataset.floorResize)
+      if (!shape) return
+      selectedFloorShapeId = shape.id
+      floorGesture = { kind: 'shape-resize', id: shape.id, endpoint: resizeHandle.dataset.floorEndpoint, original: shape }
+      return
+    }
+
+    if (marker && floorTool === 'select') {
+      selectedFloorShapeId = ''
+      floorTableMoved = false
+      const table = data.tables.find((item) => item.id === marker.dataset.floorTable)
+      if (!table) return
+      const position = floorTablePosition(table, data.tables.indexOf(table))
+      floorGesture = { kind: 'table', id: table.id, startX: point.x, startY: point.y, offsetX: point.x - position.x, offsetY: point.y - position.y }
+      return
+    }
+
+    if (shapeNode && floorTool === 'select') {
+      const shape = data.floorPlan?.shapes?.find((item) => item.id === shapeNode.dataset.floorShape)
+      if (!shape) return
+      selectedFloorShapeId = shape.id
+      floorGesture = { kind: 'shape-move', id: shape.id, startX: point.x, startY: point.y, original: shape }
+      return
+    }
+
+    if (floorTool !== 'select') {
+      selectedFloorShapeId = ''
+    } else {
+      selectedFloorShapeId = ''
+    }
+
+    if (!marker && floorTool !== 'select') {
+      floorGesture = { kind: 'shape-create', type: floorTool }
+      floorDraft = { type: floorTool, x1: point.x, y1: point.y, x2: point.x, y2: point.y, width: point.width, height: point.height }
+    }
+  }
+
+  function moveFloorGesture(event) {
+    if (!floorGesture) return
+    if (floorGesture.kind === 'canvas-resize') {
+      const canvas = document.querySelector('.floor-canvas')
+      const view = canvas?.closest('.dashboard-view')
+      const settings = view?.querySelector('.floor-table-settings')
+      const canvasBounds = canvas?.getBoundingClientRect()
+      const settingsBounds = settings?.getBoundingClientRect()
+      const settingsBesideCanvas = canvasBounds && settingsBounds && settingsBounds.top < canvasBounds.bottom
+      const rightEdge = settingsBesideCanvas ? settingsBounds.left - 14 : view?.getBoundingClientRect().right
+      const availableWidth = canvasBounds && rightEdge
+        ? rightEdge - canvasBounds.left
+        : floorGesture.width
+      const maxWidth = Math.max(1, availableWidth)
+      const minWidth = Math.min(MIN_FLOOR_CANVAS_WIDTH, maxWidth, floorGesture.width)
+      const width = Math.min(maxWidth, Math.max(minWidth, floorGesture.width + event.clientX - floorGesture.startX))
+      const height = Math.max(MIN_FLOOR_CANVAS_HEIGHT, floorGesture.height + event.clientY - floorGesture.startY)
+      const shapes = data.floorPlan?.shapes ?? []
+      data = {
+        ...data,
+        floorPlan: {
+          ...data.floorPlan,
+          width,
+          height,
+          shapes: shapes.map((shape) => ({ ...shape, width, height })),
+        },
+      }
+      return
+    }
+    const point = floorPoint(event)
+    if (!point) return
+    if (floorGesture.kind === 'table') {
+      if (Math.hypot(point.x - floorGesture.startX, point.y - floorGesture.startY) > 0.4) floorTableMoved = true
+      data = {
+        ...data,
+        tables: data.tables.map((table) => table.id === floorGesture.id
+          ? { ...table, x: Math.max(4, Math.min(96, point.x - floorGesture.offsetX)), y: Math.max(6, Math.min(94, point.y - floorGesture.offsetY)) }
+          : table),
+      }
+      return
+    }
+    if (floorGesture.kind === 'shape-create') {
+      floorDraft = { ...floorDraft, x2: point.x, y2: point.y, width: point.width, height: point.height }
+      return
+    }
+    const deltaX = point.x - floorGesture.startX
+    const deltaY = point.y - floorGesture.startY
+    const original = floorGesture.original
+    const shapes = data.floorPlan?.shapes ?? []
+    data = {
+      ...data,
+      floorPlan: {
+        ...data.floorPlan,
+        shapes: shapes.map((shape) => {
+          if (shape.id !== floorGesture.id) return shape
+          if (floorGesture.kind === 'shape-move') {
+            const minX = Math.min(original.x1, original.x2)
+            const maxX = Math.max(original.x1, original.x2)
+            const minY = Math.min(original.y1, original.y2)
+            const maxY = Math.max(original.y1, original.y2)
+            const safeX = Math.max(-minX, Math.min(100 - maxX, deltaX))
+            const safeY = Math.max(-minY, Math.min(100 - maxY, deltaY))
+            return { ...original, x1: original.x1 + safeX, y1: original.y1 + safeY, x2: original.x2 + safeX, y2: original.y2 + safeY }
+          }
+          const endpoint = floorGesture.endpoint === 'start' ? '1' : '2'
+          return { ...original, [`x${endpoint}`]: point.x, [`y${endpoint}`]: point.y, width: point.width, height: point.height }
+        }),
+      },
+    }
+  }
+
+  function finishFloorGesture() {
+    if (floorGesture?.kind === 'table' && floorTableMoved) {
+      suppressFloorTableClick = true
+      window.setTimeout(() => (suppressFloorTableClick = false), 0)
+    }
+    floorTableMoved = false
+    if (floorGesture?.kind === 'shape-create' && floorDraft) {
+      const shapes = data.floorPlan?.shapes ?? []
+      const shape = { ...floorDraft, id: `shape-${Date.now()}` }
+      data = { ...data, floorPlan: { ...data.floorPlan, shapes: [...shapes, shape] } }
+      selectedFloorShapeId = shape.id
+      floorTool = 'select'
+    }
+    floorGesture = null
+    floorDraft = null
+  }
+
+  function undoFloorShape() {
+    const shapes = data.floorPlan?.shapes ?? []
+    if (shapes.at(-1)?.id === selectedFloorShapeId) selectedFloorShapeId = ''
+    data = { ...data, floorPlan: { ...data.floorPlan, shapes: shapes.slice(0, -1) } }
+  }
+
+  function deleteSelectedFloorShape() {
+    if (!selectedFloorShapeId) return
+    data = {
+      ...data,
+      floorPlan: { ...data.floorPlan, shapes: (data.floorPlan?.shapes ?? []).filter((shape) => shape.id !== selectedFloorShapeId) },
+    }
+    selectedFloorShapeId = ''
+  }
+
+  function handleFloorShapeDeleteKey(event) {
+    if (!['Backspace', 'Delete'].includes(event.key)) return
+    if (active !== 'seating' || seatingView !== 'floor' || !selectedFloorShapeId) return
+    if (event.target.closest?.('input, textarea, select, [contenteditable="true"]')) return
+    event.preventDefault()
+    deleteSelectedFloorShape()
+  }
+
+  function resizeShapeWithKeyboard(event, shape, endpoint) {
+    const moves = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
+    const movement = moves[event.key]
+    if (!movement) return
+    event.preventDefault()
+    const xKey = endpoint === 'start' ? 'x1' : 'x2'
+    const yKey = endpoint === 'start' ? 'y1' : 'y2'
+    const shapes = data.floorPlan?.shapes ?? []
+    data = {
+      ...data,
+      floorPlan: {
+        ...data.floorPlan,
+        shapes: shapes.map((item) => item.id === shape.id ? {
+          ...item,
+          [xKey]: Math.max(0, Math.min(100, item[xKey] + movement[0])),
+          [yKey]: Math.max(0, Math.min(100, item[yKey] + movement[1])),
+        } : item),
+      },
+    }
+  }
+
+  function removeFloorTable(tableId) {
+    removeTable(tableId)
+  }
+
+  function floorShapeGeometry(shape) {
+    const x = Math.min(shape.x1, shape.x2)
+    const y = Math.min(shape.y1, shape.y2)
+    const width = Math.abs(shape.x2 - shape.x1)
+    const height = Math.abs(shape.y2 - shape.y1)
+    const radiusPixels = Math.hypot((shape.x2 - shape.x1) * (shape.width ?? 1) / 100, (shape.y2 - shape.y1) * (shape.height ?? 1) / 100) / 2
+    return {
+      x, y, width, height,
+      cx: (shape.x1 + shape.x2) / 2,
+      cy: (shape.y1 + shape.y2) / 2,
+      rx: (radiusPixels / (shape.width ?? 1)) * 100,
+      ry: (radiusPixels / (shape.height ?? 1)) * 100,
+    }
   }
 
   function addGift(event) {
@@ -260,6 +600,7 @@
 
   function removeGift(giftId) {
     data = { ...data, gifts: data.gifts.filter((gift) => gift.id !== giftId) }
+    selectedGiftIds = selectedGiftIds.filter((id) => id !== giftId)
   }
 
   function updatePhoto(photoId, status) {
@@ -338,7 +679,14 @@
 
 <svelte:window
   onclick={closeGuestMenuFromOutside}
-  onkeydown={(event) => event.key === 'Escape' && (openGuestMenuId = '')}
+  onkeydown={(event) => {
+    if (event.key === 'Escape') openGuestMenuId = ''
+    handleFloorShapeDeleteKey(event)
+  }}
+  onpointerdown={beginFloorGesture}
+  onpointermove={moveFloorGesture}
+  onpointerup={finishFloorGesture}
+  onpointercancel={finishFloorGesture}
 />
 
 <svelte:head>
@@ -466,11 +814,17 @@
             <label class="dashboard-search"><span aria-hidden="true">⌕</span><input bind:value={guestSearch} placeholder="Search guests or email" aria-label="Search guests" /></label>
             <span>{filteredGuests.length} guests shown</span>
           </div>
+          {#if visibleSelectedGuestIds.length > 0}
+            <div class="bulk-action-toolbar" role="toolbar" aria-label="Selected guest actions">
+              <span>{visibleSelectedGuestIds.length} selected</span>
+              <button type="button" class="bulk-delete-button" onclick={() => requestBulkDelete('guests')}>Delete selected</button>
+            </div>
+          {/if}
 
           <div class="dashboard-table-wrap">
             <table class="dashboard-data-table dashboard-guest-table">
               <thead><tr>
-                <th aria-sort={guestSort.key === 'name' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={guestSort.key === 'name'} type="button" onclick={() => sortGuests('name')}>Name <span aria-hidden="true">{guestSort.key === 'name' && guestSort.direction === 'desc' ? '↓' : '↑'}</span></button></th>
+                <th aria-sort={guestSort.key === 'name' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><div class="bulk-header-cell"><input class="bulk-select-checkbox" use:setIndeterminate={someVisibleGuestsSelected} type="checkbox" checked={allVisibleGuestsSelected} onchange={(event) => selectVisibleGuests(event.currentTarget.checked)} aria-label="Select all visible guests" /><button class="guest-sort-button" class:sorted={guestSort.key === 'name'} type="button" onclick={() => sortGuests('name')}>Name <span aria-hidden="true">{guestSort.key === 'name' && guestSort.direction === 'desc' ? '↓' : '↑'}</span></button></div></th>
                 <th aria-sort={guestSort.key === 'party' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={guestSort.key === 'party'} type="button" onclick={() => sortGuests('party')}>Number of people <span aria-hidden="true">{guestSort.key === 'party' && guestSort.direction === 'desc' ? '↓' : '↑'}</span></button></th>
                 <th aria-sort={guestSort.key === 'email' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={guestSort.key === 'email'} type="button" onclick={() => sortGuests('email')}>Contact details <span aria-hidden="true">{guestSort.key === 'email' && guestSort.direction === 'desc' ? '↓' : '↑'}</span></button></th>
                 <th>Note</th>
@@ -492,6 +846,7 @@
                   {@const isEditing = editingGuestId === guest.id}
                   <tr>
                     <td>
+                      <input class="bulk-select-checkbox" type="checkbox" checked={selectedGuestIds.includes(guest.id)} onchange={() => toggleGuestSelection(guest.id)} aria-label={`Select ${guest.name}`} />
                       <i class={avatarTone(guest.id || guest.name)}>{guest.name.slice(0, 1)}</i>
                       {#if isEditing && editingGuestField === 'name'}
                         <input class="guest-inline-editor" data-guest-edit="name" bind:value={guestEditForm.name} oninput={markGuestEditDirty} aria-label="Guest name" />
@@ -568,22 +923,95 @@
             <button class="dashboard-primary" type="button" onclick={() => (showTableForm = true)}>+ Add table</button>
           </header>
 
-          <div class="seating-summary"><span><strong>{data.tables.length}</strong> tables</span><span><strong>{summary.attending}</strong> attending</span><span><strong>{unassignedGuests.reduce((total, guest) => total + guest.party, 0)}</strong> seats unassigned</span></div>
+          <div class="seating-summary"><span><strong>{data.tables.length}</strong> tables</span><span><strong>{summary.attending}</strong> attending</span><span><strong>{unassignedGuests.reduce((total, guest) => total + guest.party, 0)}</strong> seats unassigned</span><div class="seating-view-switch" role="group" aria-label="Seating view"><button class:active={seatingView === 'tables'} type="button" aria-pressed={seatingView === 'tables'} onclick={() => (seatingView = 'tables')}>Tables</button><button class:active={seatingView === 'floor'} type="button" aria-pressed={seatingView === 'floor'} onclick={() => (seatingView = 'floor')}>Floor plan</button></div></div>
 
-          {#if unassignedGuests.length > 0}
+          <div class="seating-controls">
+            <div class="table-shape-setting">
+              <span id="table-shape-label">Table shape</span>
+              <div class="table-shape-options" role="group" aria-labelledby="table-shape-label">
+                <button class:active={floorTableShape === 'round'} type="button" aria-pressed={floorTableShape === 'round'} onclick={() => setFloorTableShape('round')}><i class="shape-swatch shape-swatch--round" aria-hidden="true"></i>Round</button>
+                <button class:active={floorTableShape === 'rectangle'} type="button" aria-pressed={floorTableShape === 'rectangle'} onclick={() => setFloorTableShape('rectangle')}><i class="shape-swatch shape-swatch--rectangle" aria-hidden="true"></i>Rectangle</button>
+              </div>
+            </div>
+            {#if seatingView === 'floor'}
+              <div class="floor-plan-toolbar" role="group" aria-label="Floor plan tools">
+                <button class="floor-plan-tool" class:active={floorTool === 'select'} type="button" aria-label="Select and move" data-tooltip="Select and move" aria-pressed={floorTool === 'select'} onclick={() => (floorTool = 'select')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v17l5-5 3 6 3-1-3-6h7L5 3z" /></svg></button>
+                <button class="floor-plan-tool" class:active={floorTool === 'rect'} type="button" aria-label="Rectangle" data-tooltip="Rectangle" aria-pressed={floorTool === 'rect'} onclick={() => (floorTool = 'rect')}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="1" /></svg></button>
+                <button class="floor-plan-tool" class:active={floorTool === 'circle'} type="button" aria-label="Circle" data-tooltip="Circle" aria-pressed={floorTool === 'circle'} onclick={() => (floorTool = 'circle')}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /></svg></button>
+                <button class="floor-plan-tool" class:active={floorTool === 'line'} type="button" aria-label="Line" data-tooltip="Line" aria-pressed={floorTool === 'line'} onclick={() => (floorTool = 'line')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 19 14-14" /></svg></button>
+                {#if selectedFloorShape && floorTool === 'select'}
+                  <button class="floor-plan-tool floor-plan-delete" type="button" aria-label="Delete shape" data-tooltip="Delete shape" onclick={deleteSelectedFloorShape}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v6m4-6v6" /></svg></button>
+                {/if}
+                <button class="floor-plan-tool floor-plan-undo" type="button" onclick={undoFloorShape} disabled={!data.floorPlan?.shapes?.length} aria-label="Undo last shape" data-tooltip="Undo last shape"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7v6h6" /><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" /></svg></button>
+              </div>
+            {/if}
+          </div>
+
+          {#if seatingView === 'tables' && unassignedGuests.length > 0}
             <section class="unassigned-pool" role="group" aria-label="Unassigned guests" ondragover={(event) => event.preventDefault()} ondrop={() => dropGuest('')}>
               <div><span>Unassigned guests</span><small>Drag each guest to a table</small></div>
               <div>{#each unassignedGuests as guest}<button draggable="true" ondragstart={() => (draggedGuestId = guest.id)} type="button"><i class={avatarTone(guest.id || guest.name)}>{guest.name.slice(0, 1)}</i>{guest.name}<b>{guest.party}</b></button>{/each}</div>
             </section>
           {/if}
 
+          {#if seatingView === 'floor'}
+            <div class="floor-plan-layout">
+              <div class="floor-canvas-wrap" style={floorCanvasStyle()}>
+                <div class:draw-mode={floorTool !== 'select'} class="floor-canvas" style={floorCanvasStyle()} aria-label="Floor plan canvas">
+                  <svg class="floor-canvas__shapes" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                    {#each [...(data.floorPlan?.shapes ?? []), ...(floorDraft ? [floorDraft] : [])] as shape (shape.id ?? 'preview')}
+                      {@const geometry = floorShapeGeometry(shape)}
+                      <g data-floor-shape={shape.id}>
+                        {#if shape.type === 'rect'}
+                          <rect class:preview={!shape.id} class:selected={shape.id === selectedFloorShapeId} x={geometry.x} y={geometry.y} width={Math.max(geometry.width, 0.3)} height={Math.max(geometry.height, 0.3)} />
+                        {:else if shape.type === 'circle'}
+                          <ellipse class:preview={!shape.id} class:selected={shape.id === selectedFloorShapeId} cx={geometry.cx} cy={geometry.cy} rx={Math.max(geometry.rx, 0.15)} ry={Math.max(geometry.ry, 0.15)} />
+                        {:else}
+                          <line class:preview={!shape.id} class:selected={shape.id === selectedFloorShapeId} x1={shape.x1} y1={shape.y1} x2={shape.x2} y2={shape.y2} />
+                          <line class="floor-shape-hit-area" x1={shape.x1} y1={shape.y1} x2={shape.x2} y2={shape.y2} />
+                        {/if}
+                      </g>
+                    {/each}
+                  </svg>
+                  {#if selectedFloorShape && floorTool === 'select'}
+                    <button class="floor-shape-handle" style={`--handle-x:${selectedFloorShape.x1}%;--handle-y:${selectedFloorShape.y1}%`} type="button" data-floor-resize={selectedFloorShape.id} data-floor-endpoint="start" aria-label="Resize shape from start point" title="Drag to resize" onkeydown={(event) => resizeShapeWithKeyboard(event, selectedFloorShape, 'start')}></button>
+                    <button class="floor-shape-handle" style={`--handle-x:${selectedFloorShape.x2}%;--handle-y:${selectedFloorShape.y2}%`} type="button" data-floor-resize={selectedFloorShape.id} data-floor-endpoint="end" aria-label="Resize shape from end point" title="Drag to resize" onkeydown={(event) => resizeShapeWithKeyboard(event, selectedFloorShape, 'end')}></button>
+                  {/if}
+                  {#each data.tables as table, tableIndex (table.id)}
+                    {@const position = floorTablePosition(table, tableIndex)}
+                    {@const seated = tableGuests(table.id)}
+                    {@const occupied = tablePartyCount(table.id)}
+                    <div class:opens-left={position.x > 62} class:opens-up={position.y > 66} class:popup-open={openFloorTableId === table.id} class="floor-table-marker-wrap" style={`--floor-x:${position.x}%;--floor-y:${position.y}%`}>
+                      <button class={`floor-table-marker floor-table-marker--${floorTableShape}`} class:dragging={floorGesture?.id === table.id} type="button" data-floor-table={table.id} aria-label={`${table.name}, ${occupied} of ${table.capacity} seats occupied`} aria-haspopup="dialog" aria-expanded={openFloorTableId === table.id} onclick={() => toggleFloorTablePopup(table.id)}>
+                        <span>{table.name}</span>
+                        {#each Array(table.capacity) as _, seat}
+                          <i class:filled={seat < occupied} style={seatDotStyle(seat, table.capacity, floorTableShape, 'floor')} aria-hidden="true"></i>
+                        {/each}
+                      </button>
+                      {#if openFloorTableId === table.id}
+                        <div class="floor-table-popover" role="dialog" tabindex="-1" aria-label={`${table.name} seated guests`}>
+                          <header><strong>{table.name}</strong><button type="button" aria-label="Close guest list" onclick={() => (openFloorTableId = '')}>×</button></header>
+                          {#if seated.length > 0}
+                            <ul>{#each seated as guest (guest.id)}<li>{guest.name}</li>{/each}</ul>
+                          {:else}
+                            <p>No guests seated yet.</p>
+                          {/if}
+                        </div>
+                      {/if}
+                    </div>
+                  {/each}
+                  <button class="floor-canvas-resize" type="button" data-floor-canvas-resize aria-label="Resize floor plan canvas" title="Drag to resize canvas"><span></span></button>
+                </div>
+              </div>
+            </div>
+          {:else}
           <div class="table-plan-grid">
             {#each data.tables as table, tableIndex}
               {@const seated = tableGuests(table.id)}
               {@const occupied = tablePartyCount(table.id)}
               <article class:over-capacity={occupied > table.capacity} class="seating-table" ondragover={(event) => event.preventDefault()} ondrop={() => dropGuest(table.id)}>
                 <header><span>0{tableIndex + 1}</span><div><input value={table.name} onchange={(event) => (data = { ...data, tables: data.tables.map((item) => item.id === table.id ? { ...item, name: event.currentTarget.value } : item) })} aria-label="Table name" /><small>{occupied} of {table.capacity} seats</small></div><button type="button" onclick={() => removeTable(table.id)} aria-label={`Remove ${table.name}`}>×</button></header>
-                <div class="seating-table__visual"><div><strong>{table.name}</strong><span>{table.capacity} seats</span></div>{#each Array(table.capacity) as _, seat}<i class:filled={seat < occupied}></i>{/each}</div>
+                <div class={`seating-table__visual seating-table__visual--${floorTableShape}`}><div><strong>{table.name}</strong><span>{table.capacity} seats</span></div>{#each Array(table.capacity) as _, seat}<i class:filled={seat < occupied} style={seatDotStyle(seat, table.capacity, floorTableShape, 'list')}></i>{/each}</div>
                 <div class="seating-table__guests">
                   {#each seated as guest}<button draggable="true" ondragstart={() => (draggedGuestId = guest.id)} type="button"><i class={avatarTone(guest.id || guest.name)}>{guest.name.slice(0, 1)}</i><span>{guest.name}<small>Party of {guest.party}</small></span><b>⋮⋮</b></button>{/each}
                   {#if seated.length === 0}<p>Drop guests here</p>{/if}
@@ -591,6 +1019,7 @@
               </article>
             {/each}
           </div>
+          {/if}
         </section>
 
       {:else if active === 'photos'}
@@ -608,9 +1037,15 @@
         <section class="dashboard-view" aria-labelledby="gifts-heading">
           <header class="dashboard-page-heading"><div><p class="dashboard-eyebrow">Gift list</p><h1 id="gifts-heading">Thoughtful things</h1><p>Track monetary gifts and meaningful items, linked directly to your guests.</p></div><button class="dashboard-primary" type="button" onclick={() => openGiftForm()}>+ Add gift</button></header>
           <div class="gift-summary"><span><strong>{data.gifts.length}</strong> gifts received</span><span><strong>{data.gifts.filter((gift) => gift.thanked).length}</strong> thank-yous sent</span><i style={`--progress:${(data.gifts.filter((gift) => gift.thanked).length / Math.max(1, data.gifts.length)) * 100}%`}></i></div>
+          {#if visibleSelectedGiftIds.length > 0}
+            <div class="bulk-action-toolbar" role="toolbar" aria-label="Selected gift actions">
+              <span>{visibleSelectedGiftIds.length} selected</span>
+              <button type="button" class="bulk-delete-button" onclick={() => requestBulkDelete('gifts')}>Delete selected</button>
+            </div>
+          {/if}
           <div class="dashboard-table-wrap">
             <table class="dashboard-data-table dashboard-gift-table">
-              <thead><tr><th>Guest</th><th>Gift type</th><th>Amount or gift</th><th>Note</th><th>Thank you</th><th><span class="sr-only">Actions</span></th></tr></thead>
+              <thead><tr><th><div class="bulk-header-cell"><input class="bulk-select-checkbox" use:setIndeterminate={someGiftsSelected} type="checkbox" checked={allGiftsSelected} onchange={(event) => selectAllGifts(event.currentTarget.checked)} aria-label="Select all gifts" /><span>Guest</span></div></th><th>Gift type</th><th>Amount or gift</th><th>Note</th><th>Thank you</th><th><span class="sr-only">Actions</span></th></tr></thead>
               <tbody>
                 {#if showGiftForm}
                   <tr class="dashboard-inline-row dashboard-inline-gift-row">
@@ -622,7 +1057,7 @@
                     <td><div class="inline-row-actions"><button type="button" onclick={addGift}>Save</button><button type="button" onclick={() => (showGiftForm = false)}>Cancel</button></div></td>
                   </tr>
                 {/if}
-                {#each data.gifts as gift}<tr class:thanked={gift.thanked}><td><i class={avatarTone(gift.guestId || gift.guest)}>{gift.guest.slice(0, 1)}</i><span><strong>{gift.guest}</strong><small>{gift.guestId ? 'Guest list' : 'Not on guest list'}</small></span></td><td><span class={`gift-type gift-type--${gift.type}`}>{gift.type === 'money' ? 'Money' : 'Item'}</span></td><td><strong class="gift-value">{giftLabel(gift)}</strong></td><td><span class="gift-note">{gift.note || 'No note added'}</span></td><td><button class="gift-thank-toggle" class:active={gift.thanked} type="button" onclick={() => toggleThanked(gift.id)} aria-pressed={gift.thanked}><i>{gift.thanked ? '✓' : ''}</i>{gift.thanked ? 'Thanked' : 'Pending'}</button></td><td><button class="dashboard-row-remove" type="button" onclick={() => removeGift(gift.id)} aria-label={`Remove gift from ${gift.guest}`}>×</button></td></tr>{/each}
+                {#each data.gifts as gift}<tr class:thanked={gift.thanked}><td><input class="bulk-select-checkbox" type="checkbox" checked={selectedGiftIds.includes(gift.id)} onchange={() => toggleGiftSelection(gift.id)} aria-label={`Select gift from ${gift.guest}`} /><i class={avatarTone(gift.guestId || gift.guest)}>{gift.guest.slice(0, 1)}</i><span><strong>{gift.guest}</strong><small>{gift.guestId ? 'Guest list' : 'Not on guest list'}</small></span></td><td><span class={`gift-type gift-type--${gift.type}`}>{gift.type === 'money' ? 'Money' : 'Item'}</span></td><td><strong class="gift-value">{giftLabel(gift)}</strong></td><td><span class="gift-note">{gift.note || 'No note added'}</span></td><td><button class="gift-thank-toggle" class:active={gift.thanked} type="button" onclick={() => toggleThanked(gift.id)} aria-pressed={gift.thanked}><i>{gift.thanked ? '✓' : ''}</i>{gift.thanked ? 'Thanked' : 'Pending'}</button></td><td><button class="dashboard-row-remove" type="button" onclick={() => removeGift(gift.id)} aria-label={`Remove gift from ${gift.guest}`}>×</button></td></tr>{/each}
               </tbody>
             </table>
           </div>
@@ -660,6 +1095,20 @@
     tone="danger"
     onConfirm={() => removeGuest(guestToDelete.id)}
     onCancel={() => (guestToDelete = null)}
+  />
+{/if}
+
+{#if bulkDeleteRequest}
+  <ConfirmDialog
+    title={`Delete ${bulkDeleteRequest.ids.length} ${bulkDeleteRequest.type === 'guests' ? 'selected guests' : 'selected gifts'}?`}
+    message={bulkDeleteRequest.type === 'guests'
+      ? 'Selected guests will be removed from the guest list and seating. Their gift records will remain, but will no longer be linked to a guest.'
+      : 'Selected gift records will be permanently removed.'}
+    confirmLabel="Delete selected"
+    cancelLabel="Cancel"
+    tone="danger"
+    onConfirm={confirmBulkDelete}
+    onCancel={() => (bulkDeleteRequest = null)}
   />
 {/if}
 

@@ -9,6 +9,7 @@ test('dashboard seed data is tied to the purchased website', () => {
   assert.equal(data.siteUrl, 'https://ourmoments.io/clara-and-theo')
   assert.ok(data.guests.length > 0)
   assert.ok(data.tables.length > 0)
+  assert.deepEqual(data.floorPlan, { shapes: [], tableShape: 'round' })
 })
 
 test('guest and RSVP summary uses party size', () => {
