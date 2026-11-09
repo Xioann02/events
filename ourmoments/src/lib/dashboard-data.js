@@ -37,6 +37,8 @@ export function createDashboardData(site) {
       { id: 'table-3', name: 'Table 3', capacity: 6 },
     ],
     floorPlan: { shapes: [], tableShape: 'round' },
+    notesBoard: { items: [] },
+    vendors: [],
     guests,
     gifts: [
       { id: id('gift'), guestId: guestId('Elena Marin'), guest: 'Elena Marin', type: 'item', amount: '', currency: 'EUR', gift: 'Handmade ceramic serving bowl', note: 'For all the dinners ahead.', thanked: true },
@@ -90,6 +92,22 @@ export function createGift(values) {
     gift: values.type === 'item' ? values.gift.trim() : '',
     note: values.note.trim(),
     thanked: false,
+  }
+}
+
+export function createVendor(values) {
+  return {
+    id: id('vendor'),
+    name: values.name.trim(),
+    category: values.category || 'Other',
+    contact: values.contact?.trim() ?? '',
+    email: values.email?.trim() ?? '',
+    phone: values.phone?.trim() ?? '',
+    website: values.website?.trim() ?? '',
+    cost: String(values.cost ?? '').trim(),
+    deposit: String(values.deposit ?? '').trim(),
+    status: values.status || 'researching',
+    note: values.note?.trim() ?? '',
   }
 }
 

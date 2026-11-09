@@ -1,7 +1,7 @@
 <script>
   import { tick } from 'svelte'
   import { formatEventDate, getTemplate } from '../catalog.js'
-  import { createGift, createGuest, createTable, dashboardSummary } from '../dashboard-data.js'
+  import { createGift, createGuest, createTable, createVendor, dashboardSummary } from '../dashboard-data.js'
   import couplePhoto from '../../assets/modern-couple.jpg'
   import tablePhoto from '../../assets/reception-table.jpg'
   import stillLifePhoto from '../../assets/editorial-still-life.jpg'
@@ -19,6 +19,7 @@
     { id: 'music', label: 'Music', glyph: '♪' },
     { id: 'vendors', label: 'Vendors', glyph: '▤' },
     { id: 'messages', label: 'Messages', glyph: '✉' },
+    { id: 'notes', label: 'Notes', glyph: '✎' },
     { id: 'website', label: 'Website', glyph: '↗' },
     { id: 'qr', label: 'QR code', glyph: '⌗' },
   ]
@@ -43,6 +44,7 @@
   let showGuestForm = $state(false)
   let showTableForm = $state(false)
   let showGiftForm = $state(false)
+  let showVendorForm = $state(false)
   let draggedGuestId = $state('')
   let seatingView = $state('tables')
   let floorTool = $state('select')
@@ -54,11 +56,15 @@
   let openFloorTableId = $state('')
   let floorTableMoved = false
   let suppressFloorTableClick = false
+  let notesGesture = $state(null)
+  let activeNoteId = $state('')
+  let noteSelection = null
   let copied = $state(false)
   let guestForm = $state({ name: '', email: '', phone: '', adults: 1, children: 0, status: 'pending', note: '', meal: '' })
   let guestEditForm = $state({ name: '', email: '', phone: '', adults: 1, children: 0, status: 'pending', note: '', meal: '' })
   let tableForm = $state({ capacity: 8 })
   let giftForm = $state({ guestId: '', guest: '', type: 'money', amount: '', currency: 'EUR', gift: '', note: '' })
+  let vendorForm = $state({ name: '', category: 'Venue', contact: '', email: '', phone: '', website: '', cost: '', deposit: '', status: 'researching', note: '' })
 
   let summary = $derived(dashboardSummary(data))
   let template = $derived(getTemplate(site.templateId))
@@ -684,6 +690,25 @@
     if (guest) navigate('gifts')
   }
 
+  function addVendor(event) {
+    event.preventDefault()
+    if (!vendorForm.name.trim()) return
+    const vendor = createVendor(vendorForm)
+    data = { ...data, vendors: [...(data.vendors ?? []), vendor] }
+    vendorForm = { name: '', category: 'Venue', contact: '', email: '', phone: '', website: '', cost: '', deposit: '', status: 'researching', note: '' }
+    showVendorForm = false
+    onNotify(`${vendor.name} added to vendors.`)
+  }
+
+  function removeVendor(vendorId) {
+    data = { ...data, vendors: (data.vendors ?? []).filter((vendor) => vendor.id !== vendorId) }
+    onNotify('Vendor removed.')
+  }
+
+  function vendorStatusLabel(status) {
+    return ({ researching: 'Researching', contacted: 'Contacted', quoted: 'Quote received', booked: 'Booked', paid: 'Paid' })[status] ?? 'Researching'
+  }
+
   function giftLabel(gift) {
     if (gift.type === 'money') return `${gift.currency === 'EUR' ? '€' : `${gift.currency} `}${gift.amount}`
     return gift.gift
@@ -813,6 +838,136 @@
     showGuestForm = false
     showTableForm = false
     showGiftForm = false
+    showVendorForm = false
+  }
+
+  function noteContent(node, html) {
+    node.innerHTML = html ?? ''
+    return {
+      update(nextHtml) {
+        if (document.activeElement !== node && node.innerHTML !== (nextHtml ?? '')) node.innerHTML = nextHtml ?? ''
+      },
+    }
+  }
+
+  function updateNotesItems(updater) {
+    const notesBoard = data.notesBoard ?? { items: [] }
+    data = { ...data, notesBoard: { ...notesBoard, items: updater(notesBoard.items ?? []) } }
+  }
+
+  function addNoteCard(kind = 'note') {
+    const items = data.notesBoard?.items ?? []
+    const index = items.length
+    const item = {
+      id: `note-${Date.now()}-${index}`,
+      type: 'card',
+      kind,
+      x: 24 + (index % 3) * 38,
+      y: 24 + (index % 4) * 34,
+      html: kind === 'checklist'
+        ? '<label class="notes-check-row"><input type="checkbox"><span>Checklist item</span></label>'
+        : '<p>Start writing…</p>',
+    }
+    updateNotesItems((current) => [...current, item])
+    activeNoteId = item.id
+    tick().then(() => document.querySelector(`[data-note-editor="${item.id}"]`)?.focus())
+  }
+
+  function updateNoteHtml(noteId, html) {
+    updateNotesItems((items) => items.map((item) => item.id === noteId ? { ...item, html } : item))
+  }
+
+  function formatActiveNote(command, value = null) {
+    const editor = document.querySelector(`[data-note-editor="${activeNoteId}"]`)
+    if (!editor) return
+    editor.focus()
+    if (noteSelection?.id === activeNoteId) {
+      const selection = window.getSelection()
+      selection.removeAllRanges()
+      selection.addRange(noteSelection.range)
+    }
+    document.execCommand(command, false, value)
+    updateNoteHtml(activeNoteId, editor.innerHTML)
+    saveNoteSelection(activeNoteId)
+  }
+
+  function saveNoteSelection(noteId) {
+    const selection = window.getSelection()
+    if (!selection?.rangeCount) return
+    const editor = document.querySelector(`[data-note-editor="${noteId}"]`)
+    if (!editor?.contains(selection.anchorNode)) return
+    noteSelection = { id: noteId, range: selection.getRangeAt(0).cloneRange() }
+  }
+
+  function updateNoteEditor(noteId, editor) {
+    editor.querySelectorAll('input[type="checkbox"]').forEach((input) => input.toggleAttribute('checked', input.checked))
+    updateNoteHtml(noteId, editor.innerHTML)
+    saveNoteSelection(noteId)
+  }
+
+  function removeNoteItem(noteId) {
+    updateNotesItems((items) => items.filter((item) => item.id !== noteId))
+    if (activeNoteId === noteId) activeNoteId = ''
+  }
+
+  function uploadNoteImages(event) {
+    const files = [...(event.currentTarget.files ?? [])].filter((file) => file.type.startsWith('image/'))
+    const startingCount = data.notesBoard?.items?.length ?? 0
+    files.forEach((file, fileIndex) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const index = startingCount + fileIndex
+        const item = {
+          id: `note-image-${Date.now()}-${fileIndex}`,
+          type: 'image',
+          x: 32 + (index % 3) * 44,
+          y: 38 + (index % 4) * 38,
+          src: reader.result,
+          alt: file.name,
+        }
+        updateNotesItems((items) => [...items, item])
+      }
+      reader.readAsDataURL(file)
+    })
+    event.currentTarget.value = ''
+  }
+
+  function beginNotesGesture(event) {
+    if (active !== 'notes' || event.button !== 0) return
+    const dragHandle = event.target.closest?.('[data-notes-drag]')
+    const board = event.target.closest?.('.notes-board')
+    if (!dragHandle || !board || event.target.closest?.('button, input, [contenteditable="true"]')) return
+    const itemId = dragHandle.dataset.notesDrag
+    const item = (data.notesBoard?.items ?? []).find((entry) => entry.id === itemId)
+    const itemNode = board.querySelector(`[data-notes-item="${itemId}"]`)
+    if (!item || !itemNode) return
+    const boardBounds = board.getBoundingClientRect()
+    const itemBounds = itemNode.getBoundingClientRect()
+    notesGesture = {
+      id: itemId,
+      offsetX: event.clientX - itemBounds.left,
+      offsetY: event.clientY - itemBounds.top,
+      boardWidth: boardBounds.width,
+      boardHeight: boardBounds.height,
+      itemWidth: itemBounds.width,
+      itemHeight: itemBounds.height,
+    }
+    activeNoteId = item.type === 'card' ? item.id : ''
+    event.preventDefault()
+  }
+
+  function moveNotesGesture(event) {
+    if (!notesGesture || active !== 'notes') return
+    const board = document.querySelector('.notes-board')
+    if (!board) return
+    const bounds = board.getBoundingClientRect()
+    const x = Math.max(0, Math.min(bounds.width - notesGesture.itemWidth, event.clientX - bounds.left - notesGesture.offsetX))
+    const y = Math.max(0, Math.min(bounds.height - notesGesture.itemHeight, event.clientY - bounds.top - notesGesture.offsetY))
+    updateNotesItems((items) => items.map((item) => item.id === notesGesture.id ? { ...item, x, y } : item))
+  }
+
+  function finishNotesGesture() {
+    notesGesture = null
   }
 </script>
 
@@ -822,10 +977,10 @@
     if (event.key === 'Escape') openGuestMenuId = ''
     handleFloorShapeDeleteKey(event)
   }}
-  onpointerdown={beginFloorGesture}
-  onpointermove={moveFloorGesture}
-  onpointerup={finishFloorGesture}
-  onpointercancel={finishFloorGesture}
+  onpointerdown={(event) => { beginFloorGesture(event); beginNotesGesture(event) }}
+  onpointermove={(event) => { moveFloorGesture(event); moveNotesGesture(event) }}
+  onpointerup={() => { finishFloorGesture(); finishNotesGesture() }}
+  onpointercancel={() => { finishFloorGesture(); finishNotesGesture() }}
   ondblclick={handleFloorShapeDoubleClick}
 />
 
@@ -1062,10 +1217,9 @@
 
           <div class="seating-controls">
             <div class="table-shape-setting">
-              <span id="table-shape-label">Table shape</span>
-              <div class="table-shape-options" role="group" aria-labelledby="table-shape-label">
-                <button class:active={floorTableShape === 'round'} type="button" aria-pressed={floorTableShape === 'round'} onclick={() => setFloorTableShape('round')}><i class="shape-swatch shape-swatch--round" aria-hidden="true"></i>Round</button>
-                <button class:active={floorTableShape === 'rectangle'} type="button" aria-pressed={floorTableShape === 'rectangle'} onclick={() => setFloorTableShape('rectangle')}><i class="shape-swatch shape-swatch--rectangle" aria-hidden="true"></i>Rectangle</button>
+              <div class="table-shape-options" role="group" aria-label="Table shape" data-tooltip="Table shape">
+                <button class:active={floorTableShape === 'round'} type="button" aria-label="Round tables" title="Round" aria-pressed={floorTableShape === 'round'} onclick={() => setFloorTableShape('round')}><i class="shape-swatch shape-swatch--round" aria-hidden="true"></i></button>
+                <button class:active={floorTableShape === 'rectangle'} type="button" aria-label="Rectangle tables" title="Rectangle" aria-pressed={floorTableShape === 'rectangle'} onclick={() => setFloorTableShape('rectangle')}><i class="shape-swatch shape-swatch--rectangle" aria-hidden="true"></i></button>
               </div>
             </div>
             {#if seatingView === 'floor'}
@@ -1222,6 +1376,51 @@
         <section class="dashboard-view" aria-labelledby={`${active}-heading`}>
           <header class="dashboard-page-heading"><div><h1 id={`${active}-heading`}>{navItems.find((item) => item.id === active)?.label}</h1></div></header>
           <section class="dashboard-panel"><p>Coming soon</p></section>
+        </section>
+
+      {:else if active === 'notes'}
+        <section class="dashboard-view notes-view" aria-labelledby="notes-heading">
+          <header class="dashboard-page-heading notes-heading">
+            <div><h1 id="notes-heading">Notes</h1><p>Collect ideas, lists and visual references in one flexible space.</p></div>
+            <div class="notes-add-actions">
+              <button class="dashboard-secondary" type="button" onclick={() => addNoteCard('checklist')}>+ Checklist</button>
+              <button class="dashboard-primary" type="button" onclick={() => addNoteCard('note')}>+ Note card</button>
+              <label class="dashboard-secondary notes-image-upload">+ Image<input type="file" accept="image/*" multiple onchange={uploadNoteImages} /></label>
+            </div>
+          </header>
+
+          <div class="notes-format-toolbar" role="toolbar" aria-label="Note formatting">
+            <button type="button" aria-label="Bold" title="Bold" disabled={!activeNoteId} onpointerdown={(event) => event.preventDefault()} onclick={() => formatActiveNote('bold')}><strong>B</strong></button>
+            <button type="button" aria-label="Italic" title="Italic" disabled={!activeNoteId} onpointerdown={(event) => event.preventDefault()} onclick={() => formatActiveNote('italic')}><em>I</em></button>
+            <button type="button" aria-label="Underline" title="Underline" disabled={!activeNoteId} onpointerdown={(event) => event.preventDefault()} onclick={() => formatActiveNote('underline')}><u>U</u></button>
+            <button type="button" aria-label="Insert checklist item" title="Insert checklist item" disabled={!activeNoteId} onpointerdown={(event) => event.preventDefault()} onclick={() => formatActiveNote('insertHTML', '<label class="notes-check-row"><input type="checkbox"><span>Checklist item</span></label>')}>☑</button>
+            <span aria-hidden="true"></span>
+            <label class:disabled={!activeNoteId} aria-label="Text colour" title="Text colour"><i aria-hidden="true">A</i><input type="color" value="#76232a" disabled={!activeNoteId} onchange={(event) => formatActiveNote('foreColor', event.currentTarget.value)} /></label>
+            <button type="button" aria-label="Clear formatting" title="Clear formatting" disabled={!activeNoteId} onpointerdown={(event) => event.preventDefault()} onclick={() => formatActiveNote('removeFormat')}>Tx</button>
+          </div>
+
+          <div class="notes-board" aria-label="Notes board">
+            {#if !(data.notesBoard?.items?.length)}
+              <div class="notes-board-empty"><span>✎</span><strong>Your notes board is empty</strong><p>Add a note, checklist or image to begin.</p></div>
+            {/if}
+            {#each data.notesBoard?.items ?? [] as item (item.id)}
+              {#if item.type === 'card'}
+                <article class:active={activeNoteId === item.id} class="notes-card" style={`--note-x:${item.x}px;--note-y:${item.y}px`} data-notes-item={item.id}>
+                  <header data-notes-drag={item.id}>
+                    <span>{item.kind === 'checklist' ? 'Checklist' : 'Note'}</span>
+                    <button type="button" aria-label="Delete note" title="Delete note" onclick={() => removeNoteItem(item.id)}>×</button>
+                  </header>
+                  <div class="notes-card-editor" contenteditable="true" role="textbox" tabindex="0" aria-multiline="true" aria-label={item.kind === 'checklist' ? 'Checklist content' : 'Note content'} data-note-editor={item.id} use:noteContent={item.html} onfocus={() => (activeNoteId = item.id)} onmouseup={() => saveNoteSelection(item.id)} onkeyup={() => saveNoteSelection(item.id)} oninput={(event) => updateNoteEditor(item.id, event.currentTarget)} onchange={(event) => updateNoteEditor(item.id, event.currentTarget)}></div>
+                </article>
+              {:else if item.type === 'image'}
+                <figure class="notes-image" class:dragging={notesGesture?.id === item.id} style={`--note-x:${item.x}px;--note-y:${item.y}px`} data-notes-item={item.id} data-notes-drag={item.id}>
+                  <img src={item.src} alt={item.alt || 'Note reference'} draggable="false" />
+                  <button type="button" aria-label="Delete image" title="Delete image" onclick={() => removeNoteItem(item.id)}>×</button>
+                  <figcaption>{item.alt || 'Reference image'}</figcaption>
+                </figure>
+              {/if}
+            {/each}
+          </div>
         </section>
 
       {:else if active === 'website'}
