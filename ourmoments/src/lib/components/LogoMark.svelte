@@ -15,7 +15,7 @@
 
   .logo-mark > span {
     font-family: 'Bodoni Moda', Didot, 'Times New Roman', serif;
-    font-size: 0.72rem;
+    font-size: max(13px, 0.72rem);
     font-style: italic;
     font-weight: 600;
     letter-spacing: -0.08em;

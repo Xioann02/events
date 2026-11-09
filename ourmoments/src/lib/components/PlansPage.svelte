@@ -55,7 +55,7 @@
 
   .plans-intro h1 {
     font-family: var(--display);
-    font-size: clamp(3.2rem, 6vw, 5.8rem);
+    font-size: max(13px, clamp(3.2rem, 6vw, 5.8rem));
     font-weight: 400;
     line-height: 0.96;
   }
@@ -69,7 +69,7 @@
     max-width: 430px;
     margin: 20px auto 0;
     color: var(--muted);
-    font-size: 0.95rem;
+    font-size: max(13px, 0.95rem);
     line-height: 1.65;
   }
 
@@ -104,7 +104,7 @@
     justify-content: space-between;
     gap: 10px;
     color: var(--muted);
-    font-size: 0.75rem;
+    font-size: max(13px, 0.75rem);
     letter-spacing: 0.08em;
     text-transform: uppercase;
   }
@@ -115,7 +115,7 @@
     border-radius: 999px;
     color: #68151d;
     background: #f5e8e7;
-    font-size: 0.7rem;
+    font-size: max(13px, 0.7rem);
     text-align: right;
     white-space: nowrap;
   }
@@ -128,7 +128,7 @@
   .plan-card h2 {
     margin-top: 15px;
     font-family: var(--display);
-    font-size: 3rem;
+    font-size: max(13px, 3rem);
     font-weight: 400;
   }
 
@@ -136,7 +136,7 @@
     min-height: 52px;
     margin-top: 9px;
     color: var(--muted);
-    font-size: 0.95rem;
+    font-size: max(13px, 0.95rem);
     line-height: 1.6;
   }
 
@@ -150,7 +150,7 @@
   .plan-card__price strong {
     color: var(--ink);
     font-family: 'Manrope', sans-serif;
-    font-size: 3.1rem;
+    font-size: max(13px, 3.1rem);
     font-variant-numeric: tabular-nums;
     font-weight: 600;
     line-height: 1.1;
@@ -158,7 +158,7 @@
 
   .plan-card__price span {
     color: var(--muted);
-    font-size: 0.82rem;
+    font-size: max(13px, 0.82rem);
   }
 
   .plan-card .button {
@@ -180,7 +180,7 @@
     align-items: flex-start;
     gap: 11px;
     color: var(--muted);
-    font-size: 0.9rem;
+    font-size: max(13px, 0.9rem);
     line-height: 1.5;
   }
 
@@ -191,7 +191,7 @@
   .plans-note {
     margin: 22px auto 0;
     color: var(--muted);
-    font-size: 0.75rem;
+    font-size: max(13px, 0.75rem);
     text-align: center;
   }
 

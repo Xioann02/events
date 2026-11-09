@@ -86,7 +86,7 @@
 
   .confirm-dialog__eyebrow {
     color: var(--dash-accent, #76232a);
-    font-size: .6rem;
+    font-size: max(13px, .6rem);
     font-weight: 800;
     letter-spacing: .14em;
     text-transform: uppercase;
@@ -95,7 +95,7 @@
   .confirm-dialog h2 {
     margin: 9px 0 0;
     font-family: var(--display, Georgia, serif);
-    font-size: 1.8rem;
+    font-size: max(13px, 1.8rem);
     font-weight: 500;
     line-height: 1.15;
   }
@@ -103,7 +103,7 @@
   .confirm-dialog p {
     margin: 10px 0 24px;
     color: var(--dash-muted, #77746d);
-    font-size: .72rem;
+    font-size: max(13px, .72rem);
     line-height: 1.6;
   }
 
@@ -119,7 +119,7 @@
     border: 1px solid var(--dash-line, #deddd7);
     border-radius: 7px;
     font: inherit;
-    font-size: .68rem;
+    font-size: max(13px, .68rem);
     font-weight: 750;
   }
 

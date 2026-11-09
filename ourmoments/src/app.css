@@ -121,7 +121,7 @@ p {
   border-radius: 999px;
   color: var(--paper);
   background: var(--ink);
-  font-size: 0.8rem;
+  font-size: max(13px, 0.8rem);
   text-decoration: none;
   transform: translate(-50%, -180%);
   transition: transform 180ms ease;
@@ -158,7 +158,7 @@ p {
   background: transparent;
   align-items: center;
   gap: 11px;
-  font-size: 1.05rem;
+  font-size: max(13px, 1.05rem);
   font-weight: 600;
   letter-spacing: -0.045em;
   text-decoration: none;
@@ -178,7 +178,7 @@ p {
 .desktop-nav a {
   position: relative;
   color: #514a44;
-  font-size: 0.76rem;
+  font-size: max(13px, 0.76rem);
   font-weight: 600;
   text-decoration: none;
 }
@@ -213,7 +213,7 @@ p {
   min-height: 44px;
   border: 0;
   border-radius: 999px;
-  font-size: 0.75rem;
+  font-size: max(13px, 0.75rem);
   font-weight: 600;
 }
 
@@ -249,7 +249,7 @@ p {
   color: var(--paper);
   background: var(--ink);
   place-items: center;
-  font-size: 0.67rem;
+  font-size: max(13px, 0.67rem);
   font-style: normal;
 }
 
@@ -291,7 +291,7 @@ p {
   color: #756d66;
   align-items: center;
   gap: 11px;
-  font-size: 0.66rem;
+  font-size: max(13px, 0.66rem);
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -306,7 +306,7 @@ p {
 .hero-copy h1 {
   max-width: 760px;
   font-family: var(--display);
-  font-size: clamp(4.7rem, 7.1vw, 7.3rem);
+  font-size: max(13px, clamp(4.7rem, 7.1vw, 7.3rem));
   font-weight: 400;
   letter-spacing: -0.065em;
   line-height: 0.82;
@@ -335,7 +335,7 @@ p {
   align-items: center;
   justify-content: center;
   gap: 32px;
-  font-size: 0.75rem;
+  font-size: max(13px, 0.75rem);
   font-weight: 700;
   line-height: 1;
   text-decoration: none;
@@ -387,7 +387,7 @@ p {
   background: #aa7a64;
   place-items: center;
   font-family: var(--display);
-  font-size: 0.63rem;
+  font-size: max(13px, 0.63rem);
 }
 
 .proof-faces span:first-child {
@@ -401,7 +401,7 @@ p {
 
 .hero-proof p {
   color: var(--muted);
-  font-size: 0.67rem;
+  font-size: max(13px, 0.67rem);
   line-height: 1.55;
 }
 
@@ -481,7 +481,7 @@ p {
 
 .floating-card p {
   color: #8b6e5e;
-  font-size: max(9.5px, 0.55rem);
+  font-size: max(13px, max(9.5px, 0.55rem));
   font-weight: 700;
   letter-spacing: 0.2em;
   text-transform: uppercase;
@@ -491,7 +491,7 @@ p {
   display: grid;
   margin: 22px 0;
   font-family: var(--display);
-  font-size: 2.75rem;
+  font-size: max(13px, 2.75rem);
   font-weight: 400;
   letter-spacing: -0.06em;
   line-height: 0.73;
@@ -499,12 +499,12 @@ p {
 
 .floating-card strong i {
   color: var(--terracotta-deep);
-  font-size: 0.65em;
+  font-size: max(13px, 0.65em);
   font-weight: 400;
 }
 
 .floating-card > span {
-  font-size: 0.62rem;
+  font-size: max(13px, 0.62rem);
   font-weight: 600;
   letter-spacing: 0.14em;
 }
@@ -528,7 +528,7 @@ p {
 }
 
 .hero-sticker span {
-  font-size: max(9.5px, 0.47rem);
+  font-size: max(13px, max(9.5px, 0.47rem));
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -536,7 +536,7 @@ p {
 
 .hero-sticker strong {
   font-family: var(--display);
-  font-size: 1.55rem;
+  font-size: max(13px, 1.55rem);
   font-style: italic;
   font-weight: 400;
   line-height: 0.9;
@@ -544,7 +544,7 @@ p {
 
 .hero-sticker i {
   margin-top: 4px;
-  font-size: max(9.5px, 0.55rem);
+  font-size: max(13px, max(9.5px, 0.55rem));
   font-style: normal;
 }
 
@@ -563,7 +563,7 @@ p {
 .how-copy h2,
 .closing-banner h2 {
   font-family: var(--display);
-  font-size: clamp(3.3rem, 5vw, 5.4rem);
+  font-size: max(13px, clamp(3.3rem, 5vw, 5.4rem));
   font-weight: 400;
   letter-spacing: -0.058em;
   line-height: 0.92;
@@ -573,7 +573,7 @@ p {
   max-width: 390px;
   padding-bottom: 6px;
   color: var(--muted);
-  font-size: 0.91rem;
+  font-size: max(13px, 0.91rem);
   line-height: 1.7;
 }
 
@@ -624,7 +624,7 @@ p {
   border-radius: 50%;
   place-items: center;
   font-family: var(--display);
-  font-size: 1.25rem;
+  font-size: max(13px, 1.25rem);
 }
 
 .occasion-card > span:nth-child(2) {
@@ -634,14 +634,14 @@ p {
 
 .occasion-card strong {
   font-family: var(--display);
-  font-size: 1.45rem;
+  font-size: max(13px, 1.45rem);
   font-weight: 400;
   letter-spacing: -0.035em;
 }
 
 .occasion-card small {
   color: var(--muted);
-  font-size: 0.67rem;
+  font-size: max(13px, 0.67rem);
 }
 
 .occasion-card--selected small {
@@ -655,7 +655,7 @@ p {
   border-radius: 50%;
   background: rgba(39, 35, 31, 0.06);
   place-items: center;
-  font-size: 0.7rem;
+  font-size: max(13px, 0.7rem);
   font-style: normal;
 }
 
@@ -683,7 +683,7 @@ p {
 }
 
 .template-intro h2 {
-  font-size: clamp(3.7rem, 5.9vw, 6.2rem);
+  font-size: max(13px, clamp(3.7rem, 5.9vw, 6.2rem));
 }
 
 .template-intro h2 em {
@@ -698,7 +698,7 @@ p {
   border-bottom: 1px solid rgba(246, 238, 228, 0.16);
   align-items: center;
   gap: 9px;
-  font-size: 0.68rem;
+  font-size: max(13px, 0.68rem);
 }
 
 .selected-filter span {
@@ -761,7 +761,7 @@ p {
   backdrop-filter: blur(8px);
   align-items: center;
   gap: 8px;
-  font-size: 0.67rem;
+  font-size: max(13px, 0.67rem);
   font-weight: 700;
   opacity: 0;
   transform: translateY(8px);
@@ -797,12 +797,12 @@ p {
   padding-top: 7px;
   color: rgba(246, 238, 228, 0.42);
   font-family: ui-monospace, monospace;
-  font-size: 0.61rem;
+  font-size: max(13px, 0.61rem);
 }
 
 .template-meta h3 {
   font-family: var(--display);
-  font-size: 2.05rem;
+  font-size: max(13px, 2.05rem);
   font-weight: 400;
   letter-spacing: -0.045em;
 }
@@ -810,12 +810,12 @@ p {
 .template-meta p {
   margin-top: 3px;
   color: rgba(246, 238, 228, 0.53);
-  font-size: 0.68rem;
+  font-size: max(13px, 0.68rem);
 }
 
 .template-meta > strong {
   padding-top: 7px;
-  font-size: 0.77rem;
+  font-size: max(13px, 0.77rem);
   font-weight: 600;
 }
 
@@ -823,7 +823,7 @@ p {
   max-width: 380px;
   margin: 17px 0 21px 43px;
   color: rgba(246, 238, 228, 0.6);
-  font-size: 0.78rem;
+  font-size: max(13px, 0.78rem);
   line-height: 1.6;
 }
 
@@ -884,7 +884,7 @@ p {
   max-width: 430px;
   margin-top: 25px;
   color: var(--muted);
-  font-size: 0.88rem;
+  font-size: max(13px, 0.88rem);
   line-height: 1.7;
 }
 
@@ -913,12 +913,12 @@ p {
   padding-top: 7px;
   color: var(--muted);
   font-family: ui-monospace, monospace;
-  font-size: 0.63rem;
+  font-size: max(13px, 0.63rem);
 }
 
 .steps-list strong {
   font-family: var(--display);
-  font-size: 2rem;
+  font-size: max(13px, 2rem);
   font-weight: 400;
   letter-spacing: -0.04em;
 }
@@ -927,7 +927,7 @@ p {
   max-width: 460px;
   margin-top: 12px;
   color: var(--muted);
-  font-size: 0.79rem;
+  font-size: max(13px, 0.79rem);
   line-height: 1.65;
 }
 
@@ -940,7 +940,7 @@ p {
   color: var(--terracotta-deep);
   place-items: center;
   font-family: var(--display);
-  font-size: 1.35rem;
+  font-size: max(13px, 1.35rem);
   font-style: normal;
 }
 
@@ -969,7 +969,7 @@ p {
 .closing-banner h2 {
   position: relative;
   z-index: 1;
-  font-size: clamp(4rem, 6vw, 6.8rem);
+  font-size: max(13px, clamp(4rem, 6vw, 6.8rem));
 }
 
 .closing-banner h2 em {
@@ -1027,7 +1027,7 @@ p {
 
 .site-footer > p {
   font-family: var(--display);
-  font-size: 0.9rem;
+  font-size: max(13px, 0.9rem);
   font-style: italic;
 }
 
@@ -1035,7 +1035,7 @@ p {
   display: flex;
   justify-self: end;
   gap: 25px;
-  font-size: 0.65rem;
+  font-size: max(13px, 0.65rem);
 }
 
 .footer-links a {
@@ -1058,7 +1058,7 @@ p {
   box-shadow: 0 18px 55px rgba(30, 25, 22, 0.26);
   align-items: center;
   gap: 12px;
-  font-size: 0.76rem;
+  font-size: max(13px, 0.76rem);
   animation: toast-in 280ms var(--ease) both;
 }
 
@@ -1070,7 +1070,7 @@ p {
   color: #243326;
   background: #bad0b7;
   place-items: center;
-  font-size: 0.7rem;
+  font-size: max(13px, 0.7rem);
 }
 
 @keyframes toast-in {
@@ -1140,7 +1140,7 @@ p {
   align-items: center;
   justify-content: center;
   gap: 7px;
-  font-size: max(9.5px, 0.57rem);
+  font-size: max(13px, max(9.5px, 0.57rem));
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1151,7 +1151,7 @@ p {
 
 .browser-open {
   justify-self: end;
-  font-size: 0.65rem;
+  font-size: max(13px, 0.65rem);
 }
 
 .preview-document {
@@ -1235,7 +1235,7 @@ p {
   max-width: 170px;
   overflow: hidden;
   font-family: var(--display);
-  font-size: 1rem;
+  font-size: max(13px, 1rem);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1245,7 +1245,7 @@ p {
   color: var(--muted);
   align-items: center;
   gap: 6px;
-  font-size: max(9.5px, 0.55rem);
+  font-size: max(13px, max(9.5px, 0.55rem));
 }
 
 .editor-title p i {
@@ -1318,7 +1318,7 @@ p {
   width: 19px;
   height: 19px;
   border: 2px solid #fffdf9;
-  font-size: max(9.5px, 0.52rem);
+  font-size: max(13px, max(9.5px, 0.52rem));
 }
 
 .add-cart-top {
@@ -1349,7 +1349,7 @@ p {
   display: block;
   margin-bottom: 12px;
   color: var(--terracotta-deep);
-  font-size: 0.6rem;
+  font-size: max(13px, 0.6rem);
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -1357,7 +1357,7 @@ p {
 
 .editor-panel__intro h1 {
   font-family: var(--display);
-  font-size: 3.1rem;
+  font-size: max(13px, 3.1rem);
   font-weight: 400;
   letter-spacing: -0.055em;
   line-height: 0.92;
@@ -1366,7 +1366,7 @@ p {
 .editor-panel__intro p {
   margin-top: 16px;
   color: var(--muted);
-  font-size: 0.75rem;
+  font-size: max(13px, 0.75rem);
   line-height: 1.6;
 }
 
@@ -1411,7 +1411,7 @@ p {
   color: var(--muted);
   place-items: center;
   font-family: ui-monospace, monospace;
-  font-size: max(9.5px, 0.55rem);
+  font-size: max(13px, max(9.5px, 0.55rem));
 }
 
 .editor-group > summary > span:nth-child(2) {
@@ -1421,19 +1421,19 @@ p {
 
 .editor-group summary strong {
   font-family: var(--display);
-  font-size: 1.15rem;
+  font-size: max(13px, 1.15rem);
   font-weight: 400;
   letter-spacing: -0.025em;
 }
 
 .editor-group summary small {
   color: var(--muted);
-  font-size: 0.61rem;
+  font-size: max(13px, 0.61rem);
 }
 
 .editor-group > summary > i {
   color: var(--muted);
-  font-size: 1.15rem;
+  font-size: max(13px, 1.15rem);
   font-style: normal;
   transition: transform 220ms var(--ease);
 }
@@ -1467,7 +1467,7 @@ p {
 .field-row label > span,
 .repeat-card label > span {
   color: #5f5852;
-  font-size: 0.61rem;
+  font-size: max(13px, 0.61rem);
   font-weight: 600;
 }
 
@@ -1485,7 +1485,7 @@ p {
   border-radius: 9px;
   color: var(--ink);
   background: #fff;
-  font-size: 0.72rem;
+  font-size: max(13px, 0.72rem);
   outline: none;
   transition: border-color 150ms ease, box-shadow 150ms ease;
 }
@@ -1522,19 +1522,19 @@ p {
 
 .photo-customization__intro strong {
   color: var(--ink);
-  font-size: 0.8rem;
+  font-size: max(13px, 0.8rem);
 }
 
 .photo-customization__intro > span {
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: max(13px, 0.72rem);
   line-height: 1.5;
 }
 
 .image-upload-field input[type='file'] {
   min-height: 42px;
   padding: 8px;
-  font-size: 0.7rem;
+  font-size: max(13px, 0.7rem);
 }
 
 .image-upload-field input[type='file']::file-selector-button {
@@ -1555,7 +1555,7 @@ p {
   border: 0;
   color: var(--muted);
   background: transparent;
-  font-size: 0.7rem;
+  font-size: max(13px, 0.7rem);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -1581,7 +1581,7 @@ p {
   right: 9px;
   bottom: 9px;
   color: #a19a94;
-  font-size: max(9.5px, 0.5rem);
+  font-size: max(13px, max(9.5px, 0.5rem));
   pointer-events: none;
 }
 
@@ -1635,7 +1635,7 @@ p {
 
 .section-action-row > span {
   color: var(--muted);
-  font-size: max(9.5px, 0.56rem);
+  font-size: max(13px, max(9.5px, 0.56rem));
 }
 
 .remove-section {
@@ -1646,7 +1646,7 @@ p {
   background: transparent;
   align-items: center;
   gap: 6px;
-  font-size: max(9.5px, 0.57rem);
+  font-size: max(13px, max(9.5px, 0.57rem));
   font-weight: 600;
 }
 
@@ -1685,7 +1685,7 @@ p {
 .repeat-card legend {
   padding: 0 5px;
   color: var(--muted);
-  font-size: max(9.5px, 0.55rem);
+  font-size: max(13px, max(9.5px, 0.55rem));
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1703,7 +1703,7 @@ p {
   color: var(--muted);
   background: transparent;
   place-items: center;
-  font-size: 1rem;
+  font-size: max(13px, 1rem);
 }
 
 .repeat-remove:hover {
@@ -1722,7 +1722,7 @@ p {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-size: 0.63rem;
+  font-size: max(13px, 0.63rem);
   font-weight: 600;
 }
 
@@ -1734,7 +1734,7 @@ p {
 }
 
 .add-row-button span {
-  font-size: 1rem;
+  font-size: max(13px, 1rem);
   font-weight: 400;
 }
 
@@ -1746,7 +1746,7 @@ p {
   background: #f1eee8;
   align-items: flex-start;
   gap: 9px;
-  font-size: max(9.5px, 0.56rem);
+  font-size: max(13px, max(9.5px, 0.56rem));
   line-height: 1.55;
 }
 
@@ -1759,7 +1759,7 @@ p {
   border-radius: 50%;
   place-items: center;
   font-family: var(--display);
-  font-size: 0.62rem;
+  font-size: max(13px, 0.62rem);
   font-style: italic;
 }
 
@@ -1785,7 +1785,7 @@ p {
   color: #fff;
   background: #8f857b;
   place-items: center;
-  font-size: max(9.5px, 0.59rem);
+  font-size: max(13px, max(9.5px, 0.59rem));
 }
 
 .hidden-sections p {
@@ -1795,13 +1795,13 @@ p {
 
 .hidden-sections strong {
   font-family: var(--display);
-  font-size: 0.95rem;
+  font-size: max(13px, 0.95rem);
   font-weight: 400;
 }
 
 .hidden-sections small {
   color: var(--muted);
-  font-size: max(9.5px, 0.54rem);
+  font-size: max(13px, max(9.5px, 0.54rem));
 }
 
 .hidden-section-list {
@@ -1820,7 +1820,7 @@ p {
   background: #fff;
   align-items: center;
   gap: 6px;
-  font-size: max(9.5px, 0.56rem);
+  font-size: max(13px, max(9.5px, 0.56rem));
   font-weight: 600;
 }
 
@@ -1830,7 +1830,7 @@ p {
 }
 
 .hidden-section-list button span {
-  font-size: 0.85rem;
+  font-size: max(13px, 0.85rem);
 }
 
 .editor-panel__end {
@@ -1841,14 +1841,14 @@ p {
 .editor-panel__end > span {
   color: var(--terracotta-deep);
   font-family: var(--display);
-  font-size: 1.25rem;
+  font-size: max(13px, 1.25rem);
   font-style: italic;
 }
 
 .editor-panel__end p {
   margin-top: 4px;
   color: var(--muted);
-  font-size: 0.61rem;
+  font-size: max(13px, 0.61rem);
 }
 
 .preview-workspace {
@@ -1881,12 +1881,12 @@ p {
 
 .preview-workspace__header > div > span {
   font-family: var(--display);
-  font-size: 0.84rem;
+  font-size: max(13px, 0.84rem);
 }
 
 .preview-workspace__header > div > p {
   color: var(--muted);
-  font-size: max(9.5px, 0.53rem);
+  font-size: max(13px, max(9.5px, 0.53rem));
 }
 
 .preview-help {
@@ -1894,12 +1894,12 @@ p {
   color: var(--muted);
   align-items: center;
   gap: 7px;
-  font-size: max(9.5px, 0.53rem);
+  font-size: max(13px, max(9.5px, 0.53rem));
 }
 
 .preview-help span {
   color: #6e946e;
-  font-size: 0.8rem;
+  font-size: max(13px, 0.8rem);
 }
 
 .preview-stage {
@@ -1967,7 +1967,7 @@ p {
 
 .preview-modal__header span {
   color: var(--muted);
-  font-size: max(9.5px, 0.55rem);
+  font-size: max(13px, max(9.5px, 0.55rem));
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1975,7 +1975,7 @@ p {
 
 .preview-modal__header h2 {
   font-family: var(--display);
-  font-size: 1.45rem;
+  font-size: max(13px, 1.45rem);
   font-weight: 400;
   letter-spacing: -0.035em;
 }
@@ -1995,7 +1995,7 @@ p {
   background: transparent;
   place-items: center;
   font-family: Arial, sans-serif;
-  font-size: 1.45rem;
+  font-size: max(13px, 1.45rem);
   font-weight: 300;
   line-height: 1;
 }
@@ -2029,13 +2029,13 @@ p {
 
 .preview-modal__footer strong {
   font-family: var(--display);
-  font-size: 1.05rem;
+  font-size: max(13px, 1.05rem);
   font-weight: 400;
 }
 
 .preview-modal__footer p span {
   color: var(--muted);
-  font-size: max(9.5px, 0.57rem);
+  font-size: max(13px, max(9.5px, 0.57rem));
 }
 
 @keyframes backdrop-in {
@@ -2076,7 +2076,7 @@ p {
 
 .cart-drawer__header > div > span {
   color: var(--terracotta-deep);
-  font-size: max(9.5px, 0.55rem);
+  font-size: max(13px, max(9.5px, 0.55rem));
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -2085,7 +2085,7 @@ p {
 .cart-drawer__header h2 {
   margin-top: 4px;
   font-family: var(--display);
-  font-size: 2.25rem;
+  font-size: max(13px, 2.25rem);
   font-weight: 400;
   letter-spacing: -0.05em;
 }
@@ -2099,7 +2099,7 @@ p {
   background: var(--ink);
   place-items: center;
   font-family: 'DM Sans', sans-serif;
-  font-size: max(9.5px, 0.56rem);
+  font-size: max(13px, max(9.5px, 0.56rem));
   font-style: normal;
   vertical-align: middle;
 }
@@ -2130,7 +2130,7 @@ p {
   max-width: 270px;
   margin-top: 25px;
   font-family: var(--display);
-  font-size: 2rem;
+  font-size: max(13px, 2rem);
   font-weight: 400;
   letter-spacing: -0.045em;
   line-height: 0.98;
@@ -2140,7 +2140,7 @@ p {
   max-width: 270px;
   margin-top: 13px;
   color: var(--muted);
-  font-size: 0.71rem;
+  font-size: max(13px, 0.71rem);
   line-height: 1.6;
 }
 
@@ -2178,13 +2178,13 @@ p {
 
 .cart-item__art span {
   font-family: var(--display);
-  font-size: 1.12rem;
+  font-size: max(13px, 1.12rem);
   line-height: 0.9;
 }
 
 .cart-item__art i {
   margin-top: 10px;
-  font-size: max(9.5px, 0.42rem);
+  font-size: max(13px, max(9.5px, 0.42rem));
   font-style: normal;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -2222,7 +2222,7 @@ p {
 
 .cart-item__copy > span {
   color: var(--terracotta-deep);
-  font-size: max(9.5px, 0.5rem);
+  font-size: max(13px, max(9.5px, 0.5rem));
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -2231,14 +2231,14 @@ p {
 .cart-item__copy h3 {
   margin-top: 4px;
   font-family: var(--display);
-  font-size: 1.25rem;
+  font-size: max(13px, 1.25rem);
   font-weight: 400;
 }
 
 .cart-item__copy p {
   margin-top: 8px;
   color: var(--muted);
-  font-size: max(9.5px, 0.58rem);
+  font-size: max(13px, max(9.5px, 0.58rem));
   line-height: 1.55;
 }
 
@@ -2253,7 +2253,7 @@ p {
   border: 0;
   border-bottom: 1px solid currentColor;
   background: transparent;
-  font-size: max(9.5px, 0.56rem);
+  font-size: max(13px, max(9.5px, 0.56rem));
   font-weight: 600;
 }
 
@@ -2263,7 +2263,7 @@ p {
 
 .cart-item > strong {
   padding-top: 2px;
-  font-size: 0.7rem;
+  font-size: max(13px, 0.7rem);
 }
 
 .cart-drawer__footer {
@@ -2279,20 +2279,20 @@ p {
 }
 
 .cart-total span {
-  font-size: 0.68rem;
+  font-size: max(13px, 0.68rem);
   font-weight: 600;
 }
 
 .cart-total strong {
   font-family: var(--display);
-  font-size: 1.7rem;
+  font-size: max(13px, 1.7rem);
   font-weight: 400;
 }
 
 .cart-drawer__footer > p {
   margin-top: 2px;
   color: var(--muted);
-  font-size: max(9.5px, 0.53rem);
+  font-size: max(13px, max(9.5px, 0.53rem));
 }
 
 .checkout-button {
@@ -2307,7 +2307,7 @@ p {
   background: #77716b;
   align-items: center;
   justify-content: space-between;
-  font-size: 0.69rem;
+  font-size: max(13px, 0.69rem);
   font-weight: 700;
   cursor: not-allowed;
 }
@@ -2320,7 +2320,7 @@ p {
   border-bottom: 1px solid var(--line-strong);
   color: var(--muted);
   background: transparent;
-  font-size: max(9.5px, 0.58rem);
+  font-size: max(13px, max(9.5px, 0.58rem));
 }
 
 @keyframes drawer-in {
@@ -2341,7 +2341,7 @@ p {
   }
 
   .hero-copy h1 {
-    font-size: clamp(4.5rem, 7.4vw, 6.2rem);
+    font-size: max(13px, clamp(4.5rem, 7.4vw, 6.2rem));
   }
 
   .hero-visual {
@@ -2355,7 +2355,7 @@ p {
   }
 
   .floating-card strong {
-    font-size: 2.25rem;
+    font-size: max(13px, 2.25rem);
   }
 
   .editor-workspace {
@@ -2394,7 +2394,7 @@ p {
   }
 
   .hero-copy h1 {
-    font-size: clamp(5rem, 11vw, 7rem);
+    font-size: max(13px, clamp(5rem, 11vw, 7rem));
   }
 
   .hero-visual {
@@ -2442,7 +2442,7 @@ p {
   }
 
   .brand {
-    font-size: 0.98rem;
+    font-size: max(13px, 0.98rem);
   }
 
   .header-cta,
@@ -2460,7 +2460,7 @@ p {
   }
 
   .hero-copy h1 {
-    font-size: clamp(4.1rem, 19vw, 6.2rem);
+    font-size: max(13px, clamp(4.1rem, 19vw, 6.2rem));
   }
 
   .hero-actions {
@@ -2496,16 +2496,16 @@ p {
   }
 
   .floating-card p {
-    font-size: max(9.5px, 0.42rem);
+    font-size: max(13px, max(9.5px, 0.42rem));
   }
 
   .floating-card strong {
     margin: 15px 0;
-    font-size: 1.7rem;
+    font-size: max(13px, 1.7rem);
   }
 
   .floating-card > span {
-    font-size: max(9.5px, 0.45rem);
+    font-size: max(13px, max(9.5px, 0.45rem));
   }
 
   .hero-sticker {
@@ -2530,7 +2530,7 @@ p {
   .section-intro h2,
   .how-copy h2,
   .closing-banner h2 {
-    font-size: clamp(3.3rem, 15vw, 4.7rem);
+    font-size: max(13px, clamp(3.3rem, 15vw, 4.7rem));
   }
 
   .occasion-grid {
@@ -2553,7 +2553,7 @@ p {
   }
 
   .template-intro h2 {
-    font-size: clamp(3.6rem, 16vw, 5.3rem);
+    font-size: max(13px, clamp(3.6rem, 16vw, 5.3rem));
   }
 
   .selected-filter {
@@ -2669,7 +2669,7 @@ p {
 
   .editor-topbar__left::after {
     font-family: var(--display);
-    font-size: 1.05rem;
+    font-size: max(13px, 1.05rem);
     content: 'Edit invitation';
   }
 
@@ -2701,7 +2701,7 @@ p {
     border-radius: 8px;
     color: var(--muted);
     background: transparent;
-    font-size: 0.68rem;
+    font-size: max(13px, 0.68rem);
     font-weight: 600;
   }
 
@@ -2765,7 +2765,7 @@ p {
     border: 1px solid var(--line-strong);
     border-radius: 999px;
     background: transparent;
-    font-size: 0.67rem;
+    font-size: max(13px, 0.67rem);
     font-weight: 700;
   }
 
@@ -2783,7 +2783,7 @@ p {
 
 @media (max-width: 430px) {
   .hero-copy h1 {
-    font-size: 4.25rem;
+    font-size: max(13px, 4.25rem);
   }
 
   .hero-visual {
@@ -2796,7 +2796,7 @@ p {
   }
 
   .hero-sticker strong {
-    font-size: 1.2rem;
+    font-size: max(13px, 1.2rem);
   }
 
   .template-card__preview {

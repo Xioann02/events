@@ -62,7 +62,7 @@ body {
   border-radius: var(--radius-sm);
   color: #fff;
   background: var(--ink);
-  font-size: 0.65rem;
+  font-size: max(13px, 0.65rem);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -88,7 +88,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  font-size: max(9.5px, 0.54rem);
+  font-size: max(13px, max(9.5px, 0.54rem));
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -106,7 +106,7 @@ body {
 .editor-brand {
   gap: 10px;
   font-family: var(--display);
-  font-size: 1.4rem;
+  font-size: max(13px, 1.4rem);
   font-weight: 600;
   letter-spacing: -0.075em;
 }
@@ -115,7 +115,7 @@ body {
 .editor-brand > span > span {
   color: inherit;
   font-family: 'Manrope', sans-serif;
-  font-size: 0.45em;
+  font-size: max(13px, 0.45em);
   font-weight: 700;
   letter-spacing: -0.04em;
 }
@@ -126,7 +126,7 @@ body {
 
 .desktop-nav a {
   color: var(--ink);
-  font-size: 0.6rem;
+  font-size: max(13px, 0.6rem);
   font-weight: 700;
   letter-spacing: 0.11em;
   text-transform: uppercase;
@@ -145,7 +145,7 @@ body {
 .header-cta {
   min-height: 42px;
   border-radius: var(--radius-sm);
-  font-size: 0.64rem;
+  font-size: max(13px, 0.64rem);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -168,7 +168,7 @@ body {
   border-radius: var(--radius-xs);
   color: #fff;
   background: var(--ink);
-  font-size: max(9.5px, 0.55rem);
+  font-size: max(13px, max(9.5px, 0.55rem));
 }
 
 .header-cta {
@@ -209,7 +209,7 @@ body {
   margin-bottom: 24px;
   color: #4b4844;
   gap: 12px;
-  font-size: 0.65rem;
+  font-size: max(13px, 0.65rem);
   font-weight: 700;
   letter-spacing: 0.18em;
 }
@@ -222,7 +222,7 @@ body {
 .hero-copy h1 {
   max-width: min(690px, 52vw);
   margin-inline: 0;
-  font-size: clamp(3.25rem, 6.6vw, 7rem);
+  font-size: max(13px, clamp(3.25rem, 6.6vw, 7rem));
   font-weight: 700;
   letter-spacing: -0.085em;
   line-height: 0.82;
@@ -249,7 +249,7 @@ body {
 
 .hero-copy h1 em {
   display: inline;
-  font-size: 0.9em;
+  font-size: max(13px, 0.9em);
 }
 
 .hero-actions {
@@ -287,7 +287,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 28px;
-  font-size: 0.67rem;
+  font-size: max(13px, 0.67rem);
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -749,7 +749,7 @@ body {
 .section-intro h2,
 .how-copy h2,
 .closing-banner h2 {
-  font-size: clamp(3.45rem, 5vw, 5.5rem);
+  font-size: max(13px, clamp(3.45rem, 5vw, 5.5rem));
   font-weight: 500;
   letter-spacing: -0.075em;
   line-height: 0.87;
@@ -767,7 +767,7 @@ body {
   grid-column: 2;
   grid-row: 1 / span 2;
   align-self: end;
-  font-size: 0.8125rem;
+  font-size: max(13px, 0.8125rem);
   line-height: 1.72;
 }
 
@@ -797,7 +797,7 @@ body {
 .feature-index li > span {
   padding-top: 7px;
   color: var(--terracotta-deep);
-  font-size: max(9.5px, 0.5rem);
+  font-size: max(13px, max(9.5px, 0.5rem));
   font-weight: 700;
   letter-spacing: 0.12em;
 }
@@ -810,7 +810,7 @@ body {
 
 .feature-index h3 {
   font-family: var(--display);
-  font-size: 1.55rem;
+  font-size: max(13px, 1.55rem);
   font-weight: 500;
   letter-spacing: -0.055em;
   line-height: 1;
@@ -819,7 +819,7 @@ body {
 .feature-index p {
   max-width: 260px;
   color: var(--muted);
-  font-size: 0.75rem;
+  font-size: max(13px, 0.75rem);
   line-height: 1.65;
 }
 
@@ -876,7 +876,7 @@ body {
 }
 
 .template-intro h2 {
-  font-size: clamp(3.9rem, 5.9vw, 6.5rem);
+  font-size: max(13px, clamp(3.9rem, 5.9vw, 6.5rem));
   font-weight: 500;
   letter-spacing: -0.08em;
   line-height: 0.82;
@@ -974,7 +974,7 @@ body {
   background: rgba(13, 13, 13, 0.9);
   box-shadow: none;
   gap: 9px;
-  font-size: max(9.5px, 0.52rem);
+  font-size: max(13px, max(9.5px, 0.52rem));
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -996,12 +996,12 @@ body {
   padding-top: 9px;
   color: rgba(245, 243, 239, 0.44);
   font-family: 'Manrope', sans-serif;
-  font-size: max(9.5px, 0.5rem);
+  font-size: max(13px, max(9.5px, 0.5rem));
   letter-spacing: 0.1em;
 }
 
 .template-meta h3 {
-  font-size: 2.15rem;
+  font-size: max(13px, 2.15rem);
   font-weight: 500;
   letter-spacing: -0.065em;
 }
@@ -1009,14 +1009,14 @@ body {
 .template-meta p {
   margin-top: 4px;
   color: rgba(245, 243, 239, 0.52);
-  font-size: 0.625rem;
+  font-size: max(13px, 0.625rem);
   letter-spacing: 0.07em;
   text-transform: uppercase;
 }
 
 .template-meta > strong {
   padding-top: 10px;
-  font-size: 0.75rem;
+  font-size: max(13px, 0.75rem);
   letter-spacing: 0.08em;
 }
 
@@ -1024,7 +1024,7 @@ body {
   max-width: 410px;
   margin: 18px 0 23px 49px;
   color: rgba(245, 243, 239, 0.62);
-  font-size: 0.78rem;
+  font-size: max(13px, 0.78rem);
   line-height: 1.7;
 }
 
@@ -1064,7 +1064,7 @@ body {
 .how-copy > p:not(.overline) {
   max-width: 400px;
   margin-top: 30px;
-  font-size: 0.8125rem;
+  font-size: max(13px, 0.8125rem);
   line-height: 1.72;
 }
 
@@ -1087,13 +1087,13 @@ body {
 .steps-list li > span {
   color: var(--terracotta-deep);
   font-family: 'Manrope', sans-serif;
-  font-size: max(9.5px, 0.54rem);
+  font-size: max(13px, max(9.5px, 0.54rem));
   font-weight: 700;
   letter-spacing: 0.12em;
 }
 
 .steps-list strong {
-  font-size: 2.2rem;
+  font-size: max(13px, 2.2rem);
   font-weight: 500;
   letter-spacing: -0.065em;
 }
@@ -1101,7 +1101,7 @@ body {
 .steps-list p {
   max-width: 500px;
   margin-top: 14px;
-  font-size: 0.78rem;
+  font-size: max(13px, 0.78rem);
   line-height: 1.7;
 }
 
@@ -1111,7 +1111,7 @@ body {
   border: 0;
   border-radius: 0;
   color: var(--ink);
-  font-size: 1.25rem;
+  font-size: max(13px, 1.25rem);
 }
 
 /* Closing statement and footer */
@@ -1152,7 +1152,7 @@ body {
   max-width: 1120px;
   color: var(--ink);
   font-family: var(--display);
-  font-size: clamp(4.15rem, 6.4vw, 7.1rem);
+  font-size: max(13px, clamp(4.15rem, 6.4vw, 7.1rem));
   font-weight: 500;
   letter-spacing: -0.085em;
   line-height: 0.82;
@@ -1185,13 +1185,13 @@ body {
 }
 
 .site-footer > p {
-  font-size: 0.9rem;
+  font-size: max(13px, 0.9rem);
   font-style: italic;
 }
 
 .footer-links {
   gap: 29px;
-  font-size: max(9.5px, 0.52rem);
+  font-size: max(13px, max(9.5px, 0.52rem));
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1208,7 +1208,7 @@ body {
   color: #fff;
   background: #0d0d0d;
   box-shadow: 8px 8px 0 rgba(117, 29, 36, 0.28);
-  font-size: 0.65rem;
+  font-size: max(13px, 0.65rem);
 }
 
 .toast span {
@@ -1283,12 +1283,12 @@ body {
 }
 
 .editor-title > span {
-  font-size: 1rem;
+  font-size: max(13px, 1rem);
   font-weight: 500;
 }
 
 .editor-title p {
-  font-size: max(9.5px, 0.5rem);
+  font-size: max(13px, max(9.5px, 0.5rem));
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1339,12 +1339,12 @@ body {
 .editor-step {
   margin-bottom: 14px;
   color: var(--terracotta-deep);
-  font-size: max(9.5px, 0.53rem);
+  font-size: max(13px, max(9.5px, 0.53rem));
   letter-spacing: 0.18em;
 }
 
 .editor-panel__intro h1 {
-  font-size: 3.6rem;
+  font-size: max(13px, 3.6rem);
   font-weight: 500;
   letter-spacing: -0.075em;
   line-height: 0.86;
@@ -1352,7 +1352,7 @@ body {
 
 .editor-panel__intro p {
   margin-top: 19px;
-  font-size: 0.68rem;
+  font-size: max(13px, 0.68rem);
   line-height: 1.75;
 }
 
@@ -1381,13 +1381,13 @@ body {
 }
 
 .editor-group summary strong {
-  font-size: 1.3rem;
+  font-size: max(13px, 1.3rem);
   font-weight: 500;
   letter-spacing: -0.045em;
 }
 
 .editor-group summary small {
-  font-size: max(9.5px, 0.54rem);
+  font-size: max(13px, max(9.5px, 0.54rem));
 }
 
 .editor-group[open] > summary .summary-icon {
@@ -1405,7 +1405,7 @@ body {
 .field-row label > span,
 .repeat-card label > span {
   color: #4d4a46;
-  font-size: max(9.5px, 0.54rem);
+  font-size: max(13px, max(9.5px, 0.54rem));
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1423,7 +1423,7 @@ body {
   border-radius: calc(var(--radius-sm) - 2px);
   color: var(--ink);
   background: #fff;
-  font-size: 0.68rem;
+  font-size: max(13px, 0.68rem);
 }
 
 .field input:focus,
@@ -1457,7 +1457,7 @@ body {
 
 .remove-section {
   color: var(--terracotta-deep);
-  font-size: max(9.5px, 0.53rem);
+  font-size: max(13px, max(9.5px, 0.53rem));
 }
 
 .repeat-card {
@@ -1473,7 +1473,7 @@ body {
 .add-row-button {
   border-color: var(--line-strong);
   border-radius: calc(var(--radius-sm) - 2px);
-  font-size: max(9.5px, 0.57rem);
+  font-size: max(13px, max(9.5px, 0.57rem));
 }
 
 .add-row-button:hover {
@@ -1595,7 +1595,7 @@ body {
 }
 
 .cart-drawer__header h2 {
-  font-size: 2.7rem;
+  font-size: max(13px, 2.7rem);
   font-weight: 500;
   letter-spacing: -0.07em;
 }
@@ -1608,7 +1608,7 @@ body {
 }
 
 .empty-cart h3 {
-  font-size: 2.35rem;
+  font-size: max(13px, 2.35rem);
   font-weight: 500;
   letter-spacing: -0.065em;
 }
@@ -1631,7 +1631,7 @@ body {
 }
 
 .cart-item__copy h3 {
-  font-size: 1.4rem;
+  font-size: max(13px, 1.4rem);
   font-weight: 500;
 }
 
@@ -1647,13 +1647,13 @@ body {
 .checkout-button {
   border-radius: var(--radius-sm);
   background: #6a6863;
-  font-size: max(9.5px, 0.58rem);
+  font-size: max(13px, max(9.5px, 0.58rem));
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .continue-button {
-  font-size: max(9.5px, 0.54rem);
+  font-size: max(13px, max(9.5px, 0.54rem));
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -1788,7 +1788,7 @@ body {
   }
 
   .brand {
-    font-size: 1.22rem;
+    font-size: max(13px, 1.22rem);
   }
 
   .home-hero {
@@ -1804,7 +1804,7 @@ body {
   }
 
   .hero-copy h1 {
-    font-size: clamp(3.4rem, 17vw, 5.25rem);
+    font-size: max(13px, clamp(3.4rem, 17vw, 5.25rem));
   }
 
   .hero-art {
@@ -1825,7 +1825,7 @@ body {
   .section-intro h2,
   .how-copy h2,
   .closing-banner h2 {
-    font-size: clamp(3.15rem, 14vw, 4.5rem);
+    font-size: max(13px, clamp(3.15rem, 14vw, 4.5rem));
   }
 
   .feature-index {
@@ -1853,7 +1853,7 @@ body {
   }
 
   .feature-index h3 {
-    font-size: 1.55rem;
+    font-size: max(13px, 1.55rem);
   }
 
   .template-intro {
@@ -1865,7 +1865,7 @@ body {
   }
 
   .template-intro h2 {
-    font-size: clamp(3.6rem, 15.5vw, 5.1rem);
+    font-size: max(13px, clamp(3.6rem, 15.5vw, 5.1rem));
   }
 
   .template-description,
@@ -1881,7 +1881,7 @@ body {
   }
 
   .steps-list strong {
-    font-size: 2rem;
+    font-size: max(13px, 2rem);
   }
 
   .closing-banner {
@@ -1889,7 +1889,7 @@ body {
   }
 
   .closing-banner h2 {
-    font-size: clamp(3.15rem, 14vw, 4.5rem);
+    font-size: max(13px, clamp(3.15rem, 14vw, 4.5rem));
   }
 
   .site-footer {
@@ -1963,11 +1963,11 @@ body {
   }
 
   .feature-intro h2 {
-    font-size: clamp(2.8rem, 13.5vw, 3.35rem);
+    font-size: max(13px, clamp(2.8rem, 13.5vw, 3.35rem));
   }
 
   .template-intro h2 {
-    font-size: clamp(3rem, 14vw, 3.65rem);
+    font-size: max(13px, clamp(3rem, 14vw, 3.65rem));
   }
 }
 
@@ -2012,7 +2012,7 @@ body {
   color: var(--muted);
   align-items: center;
   gap: 11px;
-  font-size: 0.72rem;
+  font-size: max(13px, 0.72rem);
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -2037,7 +2037,7 @@ body {
   margin: 0;
   color: var(--ink);
   font-family: var(--display);
-  font-size: clamp(3.55rem, 5.2vw, 6.15rem);
+  font-size: max(13px, clamp(3.55rem, 5.2vw, 6.15rem));
   font-weight: 400;
   letter-spacing: -0.045em;
   line-height: 0.9;
@@ -2054,7 +2054,7 @@ body {
   display: inline;
   margin-top: 0;
   color: var(--terracotta-deep);
-  font-size: 0.94em;
+  font-size: max(13px, 0.94em);
   font-style: italic;
   font-weight: 400;
   white-space: nowrap;
@@ -2064,7 +2064,7 @@ body {
   max-width: 28rem;
   margin: 0;
   color: var(--muted);
-  font-size: clamp(0.96rem, 1.05vw, 1.06rem);
+  font-size: max(13px, clamp(0.96rem, 1.05vw, 1.06rem));
   font-weight: 400;
   letter-spacing: 0;
   line-height: 1.7;
@@ -2108,7 +2108,7 @@ body {
 
   .hero-copy h1 {
     max-width: 100%;
-    font-size: clamp(3rem, 5.4vw, 4.8rem);
+    font-size: max(13px, clamp(3rem, 5.4vw, 4.8rem));
   }
 
   .hero-lede {
@@ -2150,13 +2150,13 @@ body {
 
   .hero-copy h1 {
     max-width: none;
-    font-size: clamp(2.9rem, 10vw, 4.2rem);
+    font-size: max(13px, clamp(2.9rem, 10vw, 4.2rem));
   }
 
   .hero-lede {
     max-width: 34rem;
     margin: 0;
-    font-size: 0.92rem;
+    font-size: max(13px, 0.92rem);
     line-height: 1.65;
   }
 
@@ -2179,11 +2179,11 @@ body {
   }
 
   .hero-copy h1 {
-    font-size: clamp(2.65rem, 10.4vw, 3.25rem);
+    font-size: max(13px, clamp(2.65rem, 10.4vw, 3.25rem));
   }
 
   .hero-lede {
     display: block;
-    font-size: 0.88rem;
+    font-size: max(13px, 0.88rem);
   }
 }
