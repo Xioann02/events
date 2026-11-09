@@ -16,6 +16,9 @@
     { id: 'seating', label: 'Table seating', glyph: '⊞' },
     { id: 'photos', label: 'Photos', glyph: '▧' },
     { id: 'gifts', label: 'Gifts', glyph: '◇' },
+    { id: 'music', label: 'Music', glyph: '♪' },
+    { id: 'vendors', label: 'Vendors', glyph: '▤' },
+    { id: 'messages', label: 'Messages', glyph: '✉' },
     { id: 'website', label: 'Website', glyph: '↗' },
     { id: 'qr', label: 'QR code', glyph: '⌗' },
   ]
@@ -144,6 +147,16 @@
       : selectedGuestIds.filter((id) => !visibleIds.has(id))
   }
 
+  function updateSelectedGuestStatus(status) {
+    const selectedIds = new Set(visibleSelectedGuestIds)
+    if (!selectedIds.size) return
+    data = {
+      ...data,
+      guests: data.guests.map((guest) => selectedIds.has(guest.id) ? { ...guest, status } : guest),
+    }
+    onNotify(`Updated RSVP status for ${selectedIds.size} ${selectedIds.size === 1 ? 'guest' : 'guests'}.`)
+  }
+
   function toggleGiftSelection(giftId) {
     selectedGiftIds = selectedGiftIds.includes(giftId)
       ? selectedGiftIds.filter((id) => id !== giftId)
@@ -210,7 +223,6 @@
 
   async function openGuestField(field, guest) {
     if (editingGuestId !== guest.id) {
-      if (editingGuestId && guestEditDirty) return
       loadGuestEditForm(guest)
     }
     editingGuestField = field
@@ -227,22 +239,30 @@
     guestEditDirty = true
   }
 
-  function changeGuestStatus(guest, status) {
-    if (editingGuestId !== guest.id) {
-      if (editingGuestId && guestEditDirty) return
-      loadGuestEditForm(guest)
-    }
-    guestEditForm.status = status
+  function saveGuestPartyChange(event, field) {
+    guestEditForm[field] = Number(event.currentTarget.value)
     guestEditDirty = true
+    saveGuestEdit()
+  }
+
+  function changeGuestStatus(guest, status) {
+    updateGuest(guest.id, { status })
+    if (editingGuestId === guest.id) {
+      guestEditForm.status = status
+      guestEditDirty = false
+    }
   }
 
   function saveGuestEdit() {
-    if (!guestEditForm.name.trim()) return
+    if (!editingGuestId || !guestEditDirty) return
+    const originalGuest = data.guests.find((guest) => guest.id === editingGuestId)
+    if (!originalGuest) return
+    const name = guestEditForm.name.trim() || originalGuest.name
     const adults = Math.max(1, Number(guestEditForm.adults) || 1)
     const children = Math.max(0, Number(guestEditForm.children) || 0)
     updateGuest(editingGuestId, {
       ...guestEditForm,
-      name: guestEditForm.name.trim(),
+      name,
       adults,
       children,
       party: adults + children,
@@ -250,13 +270,8 @@
     editingGuestId = ''
     editingGuestField = ''
     guestEditDirty = false
-    onNotify('Guest updated.')
-  }
-
-  function cancelGuestEdit() {
-    editingGuestId = ''
-    editingGuestField = ''
-    guestEditDirty = false
+    guestEditForm = { ...guestEditForm, name }
+    onNotify('Guest changes saved.')
   }
 
   function sortGuests(key) {
@@ -591,6 +606,47 @@
     return gift.gift
   }
 
+  function csvCell(value) {
+    return `"${String(value ?? '').replaceAll('"', '""')}"`
+  }
+
+  function downloadCsv(filename, headers, rows) {
+    const csv = [headers, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n')
+    const blob = new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.append(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
+  function downloadGuestCsv() {
+    downloadCsv('guest-list.csv', ['Name', 'Adults', 'Children', 'Party size', 'Email', 'Phone', 'Note', 'RSVP', 'Table'], sortedGuests.map((guest) => [
+      guest.name,
+      guestAdults(guest),
+      guestChildren(guest),
+      guest.party,
+      guest.email,
+      guest.phone,
+      guest.meal || guest.note,
+      guest.status,
+      data.tables.find((table) => table.id === guest.tableId)?.name ?? '',
+    ]))
+  }
+
+  function downloadGiftCsv() {
+    downloadCsv('gift-list.csv', ['Guest', 'Gift type', 'Amount or gift', 'Note', 'Thank you'], data.gifts.map((gift) => [
+      gift.guest,
+      gift.type === 'money' ? 'Money' : 'Item',
+      giftLabel(gift),
+      gift.note,
+      gift.thanked ? 'Thanked' : 'Pending',
+    ]))
+  }
+
   function toggleThanked(giftId) {
     data = {
       ...data,
@@ -756,7 +812,6 @@
               <p class="dashboard-eyebrow">Good morning, {account.firstName}</p>
               <h1 id="dashboard-heading">Your celebration,<br /><em>beautifully organised.</em></h1>
             </div>
-            <p>Everything for {data.eventName}, from the first reply to the final photograph.</p>
           </header>
 
           <div class="dashboard-metrics">
@@ -805,7 +860,7 @@
       {:else if active === 'guests'}
         <section class="dashboard-view" aria-labelledby="guests-heading">
           <header class="dashboard-page-heading">
-            <div><p class="dashboard-eyebrow">Guest management</p><h1 id="guests-heading">Your guest list</h1><p>Keep every invitation, reply and dietary note together.</p></div>
+            <div><h1 id="guests-heading">Guest list</h1><p>Keep every invitation, reply and dietary note together.</p></div>
           </header>
 
           <div class="rsvp-stat-grid"><button class:active={rsvpFilter === 'all'} onclick={() => (rsvpFilter = 'all')} type="button"><span>All guests</span><strong>{summary.total}</strong></button><button class:active={rsvpFilter === 'attending'} onclick={() => (rsvpFilter = 'attending')} type="button"><span>Attending</span><strong>{summary.attending}</strong></button><button class:active={rsvpFilter === 'pending'} onclick={() => (rsvpFilter = 'pending')} type="button"><span>Awaiting reply</span><strong>{summary.pending}</strong></button><button class:active={rsvpFilter === 'declined'} onclick={() => (rsvpFilter = 'declined')} type="button"><span>Declined</span><strong>{summary.declined}</strong></button></div>
@@ -817,6 +872,7 @@
           {#if visibleSelectedGuestIds.length > 0}
             <div class="bulk-action-toolbar" role="toolbar" aria-label="Selected guest actions">
               <span>{visibleSelectedGuestIds.length} selected</span>
+              <label class="bulk-rsvp-control"><select aria-label="Change RSVP for selected guests" onchange={(event) => updateSelectedGuestStatus(event.currentTarget.value)}><option value="" selected disabled>RSVP</option><option value="attending">Attending</option><option value="pending">Pending</option><option value="declined">Declined</option></select></label>
               <button type="button" class="bulk-delete-button" onclick={() => requestBulkDelete('guests')}>Delete selected</button>
             </div>
           {/if}
@@ -829,7 +885,7 @@
                 <th aria-sort={guestSort.key === 'email' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={guestSort.key === 'email'} type="button" onclick={() => sortGuests('email')}>Contact details <span aria-hidden="true">{guestSort.key === 'email' && guestSort.direction === 'desc' ? '↓' : '↑'}</span></button></th>
                 <th>Note</th>
                 <th>RSVP</th>
-                <th class="guest-action-heading"><button class="guest-add-icon dashboard-primary" type="button" onclick={openGuestRow}><span aria-hidden="true">+</span> Add guest</button></th>
+                <th class="guest-action-heading"><div class="table-header-actions"><button class="guest-add-icon dashboard-primary" type="button" onclick={openGuestRow}><span aria-hidden="true">+</span> Add</button><button class="csv-download-button" type="button" onclick={downloadGuestCsv} aria-label="Download CSV" data-tooltip="Download CSV" title="Download CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></th>
               </tr></thead>
               <tbody>
                 {#if showGuestForm}
@@ -849,7 +905,7 @@
                       <input class="bulk-select-checkbox" type="checkbox" checked={selectedGuestIds.includes(guest.id)} onchange={() => toggleGuestSelection(guest.id)} aria-label={`Select ${guest.name}`} />
                       <i class={avatarTone(guest.id || guest.name)}>{guest.name.slice(0, 1)}</i>
                       {#if isEditing && editingGuestField === 'name'}
-                        <input class="guest-inline-editor" data-guest-edit="name" bind:value={guestEditForm.name} oninput={markGuestEditDirty} aria-label="Guest name" />
+                        <input class="guest-inline-editor" data-guest-edit="name" bind:value={guestEditForm.name} oninput={markGuestEditDirty} onblur={saveGuestEdit} aria-label="Guest name" />
                       {:else if isEditing}
                         <button class="guest-edit-value guest-edit-value--strong" type="button" onclick={() => openGuestField('name', guest)}>{guestEditForm.name}</button>
                       {:else}
@@ -858,7 +914,7 @@
                     </td>
                     <td>
                       {#if isEditing && editingGuestField === 'party'}
-                        <div class="guest-party-fields guest-party-fields--inline"><label><span>Adults</span><select data-guest-edit="party" bind:value={guestEditForm.adults} onchange={markGuestEditDirty} aria-label="Number of adults">{#each Array(20) as _, optionIndex}<option value={optionIndex + 1}>{optionIndex + 1}</option>{/each}</select></label><label><span>Children</span><select bind:value={guestEditForm.children} onchange={markGuestEditDirty} aria-label="Number of children">{#each Array(11) as _, optionIndex}<option value={optionIndex}>{optionIndex}</option>{/each}</select></label></div>
+                        <div class="guest-party-fields guest-party-fields--inline"><label><span>Adults</span><select data-guest-edit="party" bind:value={guestEditForm.adults} onchange={(event) => saveGuestPartyChange(event, 'adults')} aria-label="Number of adults">{#each Array(20) as _, optionIndex}<option value={optionIndex + 1}>{optionIndex + 1}</option>{/each}</select></label><label><span>Children</span><select bind:value={guestEditForm.children} onchange={(event) => saveGuestPartyChange(event, 'children')} aria-label="Number of children">{#each Array(11) as _, optionIndex}<option value={optionIndex}>{optionIndex}</option>{/each}</select></label></div>
                       {:else if isEditing}
                         <button class="guest-edit-value guest-party-label" type="button" onclick={() => openGuestField('party', guest)}>{partyLabel(guestEditForm)}</button>
                       {:else}
@@ -867,7 +923,7 @@
                     </td>
                     <td>
                       {#if isEditing && editingGuestField === 'contact'}
-                        <div class="guest-contact guest-contact--inline"><input class="guest-inline-editor" data-guest-edit="contact" bind:value={guestEditForm.email} oninput={markGuestEditDirty} type="email" aria-label="Guest email" placeholder="Email" /><input class="guest-inline-editor" bind:value={guestEditForm.phone} oninput={markGuestEditDirty} type="tel" aria-label="Guest phone" placeholder="Phone" /></div>
+                        <div class="guest-contact guest-contact--inline"><input class="guest-inline-editor" data-guest-edit="contact" bind:value={guestEditForm.email} oninput={markGuestEditDirty} onblur={saveGuestEdit} type="email" aria-label="Guest email" placeholder="Email" /><input class="guest-inline-editor" bind:value={guestEditForm.phone} oninput={markGuestEditDirty} onblur={saveGuestEdit} type="tel" aria-label="Guest phone" placeholder="Phone" /></div>
                       {:else if isEditing}
                         <button class="guest-edit-value" type="button" onclick={() => openGuestField('contact', guest)}>{[guestEditForm.email, guestEditForm.phone].filter(Boolean).join(', ') || 'No contact details'}</button>
                       {:else}
@@ -876,7 +932,7 @@
                     </td>
                     <td>
                       {#if isEditing && editingGuestField === 'meal'}
-                        <input class="guest-inline-editor" data-guest-edit="meal" bind:value={guestEditForm.meal} oninput={markGuestEditDirty} aria-label="Guest note" placeholder="Not provided" />
+                        <input class="guest-inline-editor" data-guest-edit="meal" bind:value={guestEditForm.meal} oninput={markGuestEditDirty} onblur={saveGuestEdit} aria-label="Guest note" placeholder="Not provided" />
                       {:else if isEditing}
                         <button class="guest-edit-value" type="button" onclick={() => openGuestField('meal', guest)}>{guestEditForm.meal || 'Not provided'}</button>
                       {:else}
@@ -885,29 +941,25 @@
                     </td>
                     <td>
                       {#if isEditing}
-                        <select class={`status-select status-select--${guestEditForm.status}`} bind:value={guestEditForm.status} onchange={markGuestEditDirty} aria-label={`Attendance status for ${guest.name}`}><option value="attending">Attending</option><option value="pending">Pending</option><option value="declined">Declined</option></select>
+                        <select class={`status-select status-select--${guestEditForm.status}`} bind:value={guestEditForm.status} onchange={(event) => changeGuestStatus(guest, event.currentTarget.value)} aria-label={`Attendance status for ${guest.name}`}><option value="attending">Attending</option><option value="pending">Pending</option><option value="declined">Declined</option></select>
                       {:else}
                         <select class={`status-select status-select--${guest.status}`} value={guest.status} onchange={(event) => changeGuestStatus(guest, event.currentTarget.value)} aria-label={`Attendance status for ${guest.name}`}><option value="attending">Attending</option><option value="pending">Pending</option><option value="declined">Declined</option></select>
                       {/if}
                     </td>
                     <td class="guest-row-action-cell">
-                      {#if isEditing && guestEditDirty}
-                        <div class="inline-row-actions guest-row-actions"><button class="guest-save-button" type="button" onclick={saveGuestEdit} aria-label="Save guest changes" title="Save changes">Save</button><button class="guest-cancel-button" type="button" onclick={cancelGuestEdit} aria-label="Cancel editing" title="Cancel">×</button></div>
-                      {:else}
-                        <div class="guest-action-menu">
-                          <button class="guest-menu-trigger" type="button" onclick={() => toggleGuestMenu(guest.id)} aria-label={`Actions for ${guest.name}`} aria-haspopup="menu" aria-expanded={openGuestMenuId === guest.id}>
-                            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="12" cy="19" r="1.6" /></svg>
-                          </button>
-                          {#if openGuestMenuId === guest.id}
-                            <div class:opens-up={index >= sortedGuests.length - 2} class="guest-menu-popover" role="menu">
-                              <button class="danger" type="button" role="menuitem" onclick={() => { openGuestMenuId = ''; guestToDelete = guest }}>
-                                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg>
-                                Delete
-                              </button>
-                            </div>
-                          {/if}
-                        </div>
-                      {/if}
+                      <div class="guest-action-menu">
+                        <button class="guest-menu-trigger" type="button" onclick={() => toggleGuestMenu(guest.id)} aria-label={`Actions for ${guest.name}`} aria-haspopup="menu" aria-expanded={openGuestMenuId === guest.id}>
+                          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="12" cy="19" r="1.6" /></svg>
+                        </button>
+                        {#if openGuestMenuId === guest.id}
+                          <div class:opens-up={index >= sortedGuests.length - 2} class="guest-menu-popover" role="menu">
+                            <button class="danger" type="button" role="menuitem" onclick={() => { openGuestMenuId = ''; guestToDelete = guest }}>
+                              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg>
+                              Delete
+                            </button>
+                          </div>
+                        {/if}
+                      </div>
                     </td>
                   </tr>
                 {/each}
@@ -919,8 +971,7 @@
       {:else if active === 'seating'}
         <section class="dashboard-view" aria-labelledby="seating-heading">
           <header class="dashboard-page-heading">
-            <div><p class="dashboard-eyebrow">Table plan</p><h1 id="seating-heading">Arrange the room</h1><p>Drag guests between tables, then adjust table sizes as your plan changes.</p></div>
-            <button class="dashboard-primary" type="button" onclick={() => (showTableForm = true)}>+ Add table</button>
+            <div><h1 id="seating-heading">Table seating</h1><p>Drag guests between tables, then adjust table sizes as your plan changes.</p></div>
           </header>
 
           <div class="seating-summary"><span><strong>{data.tables.length}</strong> tables</span><span><strong>{summary.attending}</strong> attending</span><span><strong>{unassignedGuests.reduce((total, guest) => total + guest.party, 0)}</strong> seats unassigned</span><div class="seating-view-switch" role="group" aria-label="Seating view"><button class:active={seatingView === 'tables'} type="button" aria-pressed={seatingView === 'tables'} onclick={() => (seatingView = 'tables')}>Tables</button><button class:active={seatingView === 'floor'} type="button" aria-pressed={seatingView === 'floor'} onclick={() => (seatingView = 'floor')}>Floor plan</button></div></div>
@@ -944,7 +995,10 @@
                 {/if}
                 <button class="floor-plan-tool floor-plan-undo" type="button" onclick={undoFloorShape} disabled={!data.floorPlan?.shapes?.length} aria-label="Undo last shape" data-tooltip="Undo last shape"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7v6h6" /><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" /></svg></button>
               </div>
+            {:else}
+              <span class="seating-tools-placeholder" aria-hidden="true"></span>
             {/if}
+            <button class="dashboard-primary seating-add-table" type="button" onclick={() => (showTableForm = true)}>+ Add table</button>
           </div>
 
           {#if seatingView === 'tables' && unassignedGuests.length > 0}
@@ -1024,7 +1078,7 @@
 
       {:else if active === 'photos'}
         <section class="dashboard-view" aria-labelledby="photos-heading">
-          <header class="dashboard-page-heading"><div><p class="dashboard-eyebrow">Guest gallery</p><h1 id="photos-heading">Shared photographs</h1><p>Review what guests upload before it appears on your website.</p></div><label class="dashboard-primary dashboard-upload">+ Upload photos<input type="file" accept="image/*" multiple onchange={uploadPhotos} /></label></header>
+          <header class="dashboard-page-heading"><div><h1 id="photos-heading">Shared photographs</h1><p>Review what guests upload before it appears on your website.</p></div><label class="dashboard-primary dashboard-upload">+ Upload photos<input type="file" accept="image/*" multiple onchange={uploadPhotos} /></label></header>
           <div class="photo-filter-row"><span>{data.photos.length} photographs</span><p>{data.photos.filter((photo) => photo.status === 'pending').length} waiting for review</p></div>
           <div class="dashboard-photo-grid">
             {#each data.photos as photo}
@@ -1035,7 +1089,7 @@
 
       {:else if active === 'gifts'}
         <section class="dashboard-view" aria-labelledby="gifts-heading">
-          <header class="dashboard-page-heading"><div><p class="dashboard-eyebrow">Gift list</p><h1 id="gifts-heading">Thoughtful things</h1><p>Track monetary gifts and meaningful items, linked directly to your guests.</p></div><button class="dashboard-primary" type="button" onclick={() => openGiftForm()}>+ Add gift</button></header>
+          <header class="dashboard-page-heading"><div><h1 id="gifts-heading">Gift list</h1><p>Track monetary gifts and meaningful items, linked directly to your guests.</p></div></header>
           <div class="gift-summary"><span><strong>{data.gifts.length}</strong> gifts received</span><span><strong>{data.gifts.filter((gift) => gift.thanked).length}</strong> thank-yous sent</span><i style={`--progress:${(data.gifts.filter((gift) => gift.thanked).length / Math.max(1, data.gifts.length)) * 100}%`}></i></div>
           {#if visibleSelectedGiftIds.length > 0}
             <div class="bulk-action-toolbar" role="toolbar" aria-label="Selected gift actions">
@@ -1045,7 +1099,7 @@
           {/if}
           <div class="dashboard-table-wrap">
             <table class="dashboard-data-table dashboard-gift-table">
-              <thead><tr><th><div class="bulk-header-cell"><input class="bulk-select-checkbox" use:setIndeterminate={someGiftsSelected} type="checkbox" checked={allGiftsSelected} onchange={(event) => selectAllGifts(event.currentTarget.checked)} aria-label="Select all gifts" /><span>Guest</span></div></th><th>Gift type</th><th>Amount or gift</th><th>Note</th><th>Thank you</th><th><span class="sr-only">Actions</span></th></tr></thead>
+              <thead><tr><th><div class="bulk-header-cell"><input class="bulk-select-checkbox" use:setIndeterminate={someGiftsSelected} type="checkbox" checked={allGiftsSelected} onchange={(event) => selectAllGifts(event.currentTarget.checked)} aria-label="Select all gifts" /><span>Guest</span></div></th><th>Gift type</th><th>Amount or gift</th><th>Note</th><th>Thank you</th><th class="table-actions-heading"><span class="sr-only">Actions</span><div class="table-header-actions"><button class="guest-add-icon dashboard-primary" type="button" onclick={() => openGiftForm()}> <span aria-hidden="true">+</span> Add</button><button class="csv-download-button" type="button" onclick={downloadGiftCsv} aria-label="Download CSV" data-tooltip="Download CSV" title="Download CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></th></tr></thead>
               <tbody>
                 {#if showGiftForm}
                   <tr class="dashboard-inline-row dashboard-inline-gift-row">
@@ -1061,6 +1115,12 @@
               </tbody>
             </table>
           </div>
+        </section>
+
+      {:else if active === 'music' || active === 'vendors' || active === 'messages'}
+        <section class="dashboard-view" aria-labelledby={`${active}-heading`}>
+          <header class="dashboard-page-heading"><div><h1 id={`${active}-heading`}>{navItems.find((item) => item.id === active)?.label}</h1></div></header>
+          <section class="dashboard-panel"><p>Coming soon</p></section>
         </section>
 
       {:else if active === 'website'}
