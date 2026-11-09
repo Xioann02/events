@@ -490,6 +490,7 @@
 .floor-plan-toolbar { display: flex; width: fit-content; max-width: 100%; padding: 4px; margin: 0; border: 1px solid var(--dash-line); border-radius: 9px; background: #eeece6; flex-wrap: wrap; gap: 2px; }
 .floor-plan-toolbar button.floor-plan-tool { position: relative; display: grid; width: 36px; min-width: 36px; height: 34px; padding: 0; place-items: center; }
 .floor-plan-toolbar button.floor-plan-tool svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.floor-plan-toolbar button.floor-plan-text-tool > span { font-family: var(--display); font-size: 18px; font-weight: 700; line-height: 1; }
 .floor-plan-toolbar button.floor-plan-tool[data-tooltip]::after { position: absolute; z-index: 20; top: calc(100% + 7px); left: 50%; padding: 5px 8px; border-radius: 4px; color: #fff; background: #252420; box-shadow: 0 3px 9px rgba(20,18,14,.18); content: attr(data-tooltip); font-size: max(13px, .64rem); font-weight: 600; opacity: 0; pointer-events: none; text-align: center; transform: translate(-50%, -2px); transition: opacity .12s ease, transform .12s ease; white-space: nowrap; }
 .floor-plan-toolbar button.floor-plan-tool[data-tooltip]:hover::after,
 .floor-plan-toolbar button.floor-plan-tool[data-tooltip]:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
@@ -514,6 +515,12 @@
 .floor-canvas__shapes .preview { stroke-dasharray: 1.4 1; opacity: .65; }
 .floor-canvas__shapes .selected { stroke: #9b2936; stroke-width: 2; }
 .floor-canvas__shapes .floor-shape-hit-area { fill: none; stroke: transparent; stroke-width: 16px; pointer-events: stroke; }
+.floor-canvas-text { position: absolute; z-index: 3; top: var(--text-y); left: var(--text-x); width: auto; max-width: 240px; height: auto; padding: 3px 5px; overflow: hidden; border: 1px solid transparent; border-radius: 3px; color: #76232a; background: transparent; cursor: grab; font-family: var(--display); font-size: 16px; font-weight: 650; line-height: 1.2; text-overflow: ellipsis; touch-action: none; transform: translate(-50%, -50%); user-select: none; white-space: nowrap; }
+.floor-canvas-text:hover { background: rgba(255,255,255,.7); }
+.floor-canvas-text.selected { border-color: #9b2936; background: #fff; box-shadow: 0 1px 4px rgba(39,36,29,.14); }
+.floor-canvas-text:focus-visible { outline: 2px solid var(--dash-accent); outline-offset: 2px; }
+.floor-canvas-text-input { box-sizing: content-box; width: 44px; min-width: 44px; cursor: text; outline: 2px solid var(--dash-accent); outline-offset: 1px; text-align: center; user-select: text; }
+.floor-shape-label { z-index: 3; max-width: 160px; padding: 2px 4px; color: #5f2026; font-size: 14px; }
 .floor-shape-handle { position: absolute; z-index: 4; top: var(--handle-y); left: var(--handle-x); width: 14px; height: 14px; padding: 0; border: 2px solid #fff; border-radius: 50%; background: #9b2936; box-shadow: 0 0 0 1px #76232a, 0 2px 5px rgba(39,36,29,.22); cursor: crosshair; touch-action: none; transform: translate(-50%, -50%); }
 .floor-shape-handle:focus-visible { outline: 2px solid #171714; outline-offset: 3px; }
 .floor-table-marker-wrap { position: absolute; z-index: 2; top: var(--floor-y); left: var(--floor-x); transform: translate(-50%, -50%); }

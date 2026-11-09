@@ -49,6 +49,8 @@
   let floorGesture = $state(null)
   let floorDraft = $state(null)
   let selectedFloorShapeId = $state('')
+  let editingFloorTextId = $state('')
+  let armedFloorTextId = $state('')
   let openFloorTableId = $state('')
   let floorTableMoved = false
   let suppressFloorTableClick = false
@@ -323,6 +325,52 @@
     data = { ...data, floorPlan: { ...data.floorPlan, tableShape: shape } }
   }
 
+  function updateFloorText(shapeId, value) {
+    data = {
+      ...data,
+      floorPlan: {
+        ...data.floorPlan,
+        shapes: (data.floorPlan?.shapes ?? []).map((shape) => shape.id === shapeId
+          ? { ...shape, [shape.type === 'text' ? 'text' : 'label']: value }
+          : shape),
+      },
+    }
+  }
+
+  async function editFloorText(shapeId) {
+    selectedFloorShapeId = shapeId
+    editingFloorTextId = shapeId
+    await tick()
+    const input = document.querySelector(`[data-floor-text-input="${shapeId}"]`)
+    input?.focus()
+    input?.select()
+  }
+
+  function handleFloorTextClick(shapeId) {
+    if (armedFloorTextId === shapeId) {
+      editFloorText(shapeId)
+      return
+    }
+    selectedFloorShapeId = shapeId
+    armedFloorTextId = shapeId
+  }
+
+  function handleFloorTextKeydown(event) {
+    if (event.key === 'Enter') event.currentTarget.blur()
+    if (event.key === 'Escape') {
+      editingFloorTextId = ''
+      event.currentTarget.blur()
+    }
+  }
+
+  function handleFloorShapeDoubleClick(event) {
+    if (active !== 'seating' || seatingView !== 'floor') return
+    const shapeId = event.target.closest?.('[data-floor-shape]')?.dataset.floorShape
+    const shape = data.floorPlan?.shapes?.find((item) => item.id === shapeId)
+    if (!shape || shape.type === 'text') return
+    editFloorText(shape.id)
+  }
+
   function toggleFloorTablePopup(tableId) {
     if (suppressFloorTableClick) {
       suppressFloorTableClick = false
@@ -385,6 +433,8 @@
     const resizeHandle = event.target.closest?.('[data-floor-resize]')
     const canvasResizeHandle = event.target.closest?.('[data-floor-canvas-resize]')
     const shapeNode = event.target.closest?.('[data-floor-shape]')
+    const textInput = event.target.closest?.('[data-floor-text-input]')
+    if (textInput) return
     if (canvasResizeHandle) {
       const bounds = canvas.getBoundingClientRect()
       floorGesture = { kind: 'canvas-resize', startX: event.clientX, startY: event.clientY, width: bounds.width, height: bounds.height }
@@ -403,6 +453,7 @@
 
     if (marker && floorTool === 'select') {
       selectedFloorShapeId = ''
+      armedFloorTextId = ''
       floorTableMoved = false
       const table = data.tables.find((item) => item.id === marker.dataset.floorTable)
       if (!table) return
@@ -414,6 +465,7 @@
     if (shapeNode && floorTool === 'select') {
       const shape = data.floorPlan?.shapes?.find((item) => item.id === shapeNode.dataset.floorShape)
       if (!shape) return
+      if (shape.type !== 'text') armedFloorTextId = ''
       selectedFloorShapeId = shape.id
       floorGesture = { kind: 'shape-move', id: shape.id, startX: point.x, startY: point.y, original: shape }
       return
@@ -421,8 +473,31 @@
 
     if (floorTool !== 'select') {
       selectedFloorShapeId = ''
+      armedFloorTextId = ''
     } else {
       selectedFloorShapeId = ''
+      armedFloorTextId = ''
+    }
+
+    if (!marker && floorTool === 'text') {
+      const shapes = data.floorPlan?.shapes ?? []
+      const shape = {
+        id: `shape-${Date.now()}`,
+        type: 'text',
+        text: 'Text',
+        x1: point.x,
+        y1: point.y,
+        x2: point.x,
+        y2: point.y,
+        width: point.width,
+        height: point.height,
+      }
+      data = { ...data, floorPlan: { ...data.floorPlan, shapes: [...shapes, shape] } }
+      selectedFloorShapeId = shape.id
+      armedFloorTextId = shape.id
+      floorTool = 'select'
+      editFloorText(shape.id)
+      return
     }
 
     if (!marker && floorTool !== 'select') {
@@ -531,12 +606,20 @@
       ...data,
       floorPlan: { ...data.floorPlan, shapes: (data.floorPlan?.shapes ?? []).filter((shape) => shape.id !== selectedFloorShapeId) },
     }
+    if (editingFloorTextId === selectedFloorShapeId) editingFloorTextId = ''
+    if (armedFloorTextId === selectedFloorShapeId) armedFloorTextId = ''
     selectedFloorShapeId = ''
   }
 
   function handleFloorShapeDeleteKey(event) {
     if (!['Backspace', 'Delete'].includes(event.key)) return
     if (active !== 'seating' || seatingView !== 'floor' || !selectedFloorShapeId) return
+    const focusedTextInput = document.activeElement?.closest?.('[data-floor-text-input]')
+    if (selectedFloorShape?.type === 'text' && !focusedTextInput) {
+      event.preventDefault()
+      deleteSelectedFloorShape()
+      return
+    }
     if (event.target.closest?.('input, textarea, select, [contenteditable="true"]')) return
     event.preventDefault()
     deleteSelectedFloorShape()
@@ -743,6 +826,7 @@
   onpointermove={moveFloorGesture}
   onpointerup={finishFloorGesture}
   onpointercancel={finishFloorGesture}
+  ondblclick={handleFloorShapeDoubleClick}
 />
 
 <svelte:head>
@@ -990,6 +1074,7 @@
                 <button class="floor-plan-tool" class:active={floorTool === 'rect'} type="button" aria-label="Rectangle" data-tooltip="Rectangle" aria-pressed={floorTool === 'rect'} onclick={() => (floorTool = 'rect')}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="1" /></svg></button>
                 <button class="floor-plan-tool" class:active={floorTool === 'circle'} type="button" aria-label="Circle" data-tooltip="Circle" aria-pressed={floorTool === 'circle'} onclick={() => (floorTool = 'circle')}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /></svg></button>
                 <button class="floor-plan-tool" class:active={floorTool === 'line'} type="button" aria-label="Line" data-tooltip="Line" aria-pressed={floorTool === 'line'} onclick={() => (floorTool = 'line')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 19 14-14" /></svg></button>
+                <button class="floor-plan-tool floor-plan-text-tool" class:active={floorTool === 'text'} type="button" aria-label="Text" data-tooltip="Text" aria-pressed={floorTool === 'text'} onclick={() => (floorTool = 'text')}><span aria-hidden="true">T</span></button>
                 {#if selectedFloorShape && floorTool === 'select'}
                   <button class="floor-plan-tool floor-plan-delete" type="button" aria-label="Delete shape" data-tooltip="Delete shape" onclick={deleteSelectedFloorShape}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v6m4-6v6" /></svg></button>
                 {/if}
@@ -1020,14 +1105,30 @@
                           <rect class:preview={!shape.id} class:selected={shape.id === selectedFloorShapeId} x={geometry.x} y={geometry.y} width={Math.max(geometry.width, 0.3)} height={Math.max(geometry.height, 0.3)} />
                         {:else if shape.type === 'circle'}
                           <ellipse class:preview={!shape.id} class:selected={shape.id === selectedFloorShapeId} cx={geometry.cx} cy={geometry.cy} rx={Math.max(geometry.rx, 0.15)} ry={Math.max(geometry.ry, 0.15)} />
-                        {:else}
+                        {:else if shape.type === 'line'}
                           <line class:preview={!shape.id} class:selected={shape.id === selectedFloorShapeId} x1={shape.x1} y1={shape.y1} x2={shape.x2} y2={shape.y2} />
                           <line class="floor-shape-hit-area" x1={shape.x1} y1={shape.y1} x2={shape.x2} y2={shape.y2} />
                         {/if}
                       </g>
                     {/each}
                   </svg>
-                  {#if selectedFloorShape && floorTool === 'select'}
+                  {#each (data.floorPlan?.shapes ?? []).filter((shape) => shape.type !== 'text' && (shape.label || editingFloorTextId === shape.id)) as shape (shape.id)}
+                    {@const labelX = (shape.x1 + shape.x2) / 2}
+                    {@const labelY = (shape.y1 + shape.y2) / 2}
+                    {#if editingFloorTextId === shape.id}
+                      <input class="floor-canvas-text floor-canvas-text-input floor-shape-label selected" style={`--text-x:${labelX}%;--text-y:${labelY}%`} value={shape.label ?? ''} data-floor-text-input={shape.id} aria-label="Edit shape label" oninput={(event) => updateFloorText(shape.id, event.currentTarget.value)} onkeydown={handleFloorTextKeydown} onblur={() => (editingFloorTextId = '')} />
+                    {:else}
+                      <button class:selected={shape.id === selectedFloorShapeId} class="floor-canvas-text floor-shape-label" style={`--text-x:${labelX}%;--text-y:${labelY}%`} type="button" data-floor-shape={shape.id} aria-label={`Shape label: ${shape.label}`} ondblclick={(event) => { event.stopPropagation(); editFloorText(shape.id) }}>{shape.label}</button>
+                    {/if}
+                  {/each}
+                  {#each (data.floorPlan?.shapes ?? []).filter((shape) => shape.type === 'text') as shape (shape.id)}
+                    {#if editingFloorTextId === shape.id}
+                      <input class="floor-canvas-text floor-canvas-text-input selected" style={`--text-x:${shape.x1}%;--text-y:${shape.y1}%`} value={shape.text ?? ''} data-floor-text-input={shape.id} aria-label="Edit floor plan text" oninput={(event) => updateFloorText(shape.id, event.currentTarget.value)} onkeydown={handleFloorTextKeydown} onblur={() => (editingFloorTextId = '')} />
+                    {:else}
+                      <button class:selected={shape.id === selectedFloorShapeId} class="floor-canvas-text" style={`--text-x:${shape.x1}%;--text-y:${shape.y1}%`} type="button" data-floor-shape={shape.id} aria-label={`Text: ${shape.text || 'Text'}`} onclick={() => handleFloorTextClick(shape.id)}>{shape.text || 'Text'}</button>
+                    {/if}
+                  {/each}
+                  {#if selectedFloorShape && selectedFloorShape.type !== 'text' && floorTool === 'select'}
                     <button class="floor-shape-handle" style={`--handle-x:${selectedFloorShape.x1}%;--handle-y:${selectedFloorShape.y1}%`} type="button" data-floor-resize={selectedFloorShape.id} data-floor-endpoint="start" aria-label="Resize shape from start point" title="Drag to resize" onkeydown={(event) => resizeShapeWithKeyboard(event, selectedFloorShape, 'start')}></button>
                     <button class="floor-shape-handle" style={`--handle-x:${selectedFloorShape.x2}%;--handle-y:${selectedFloorShape.y2}%`} type="button" data-floor-resize={selectedFloorShape.id} data-floor-endpoint="end" aria-label="Resize shape from end point" title="Drag to resize" onkeydown={(event) => resizeShapeWithKeyboard(event, selectedFloorShape, 'end')}></button>
                   {/if}
