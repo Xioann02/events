@@ -33,9 +33,12 @@
   let guestSearch = $state('')
   let guestSort = $state({ key: 'name', direction: 'asc' })
   let guestToDelete = $state(null)
+  let vendorToDelete = $state(null)
   let bulkDeleteRequest = $state(null)
   let selectedGuestIds = $state([])
   let selectedGiftIds = $state([])
+  let selectedMessageIds = $state([])
+  let selectedVendorIds = $state([])
   let openGuestMenuId = $state('')
   let editingGuestId = $state('')
   let editingGuestField = $state('')
@@ -76,6 +79,12 @@
   let visibleSelectedGiftIds = $derived(data.gifts.filter((gift) => selectedGiftIds.includes(gift.id)).map((gift) => gift.id))
   let allGiftsSelected = $derived(data.gifts.length > 0 && visibleSelectedGiftIds.length === data.gifts.length)
   let someGiftsSelected = $derived(visibleSelectedGiftIds.length > 0 && !allGiftsSelected)
+  let visibleSelectedMessageIds = $derived((data.messages ?? []).filter((message) => selectedMessageIds.includes(message.id)).map((message) => message.id))
+  let allMessagesSelected = $derived((data.messages ?? []).length > 0 && visibleSelectedMessageIds.length === (data.messages ?? []).length)
+  let someMessagesSelected = $derived(visibleSelectedMessageIds.length > 0 && !allMessagesSelected)
+  let visibleSelectedVendorIds = $derived((data.vendors ?? []).filter((vendor) => selectedVendorIds.includes(vendor.id)).map((vendor) => vendor.id))
+  let allVendorsSelected = $derived((data.vendors ?? []).length > 0 && visibleSelectedVendorIds.length === (data.vendors ?? []).length)
+  let someVendorsSelected = $derived(visibleSelectedVendorIds.length > 0 && !allVendorsSelected)
   let filteredGuests = $derived(
     data.guests.filter((guest) => {
       const matchesSearch = `${guest.name} ${guest.email}`.toLowerCase().includes(guestSearch.toLowerCase())
@@ -177,10 +186,48 @@
       : selectedGiftIds.filter((id) => !data.gifts.some((gift) => gift.id === id))
   }
 
+  function toggleMessageSelection(messageId) {
+    selectedMessageIds = selectedMessageIds.includes(messageId)
+      ? selectedMessageIds.filter((id) => id !== messageId)
+      : [...selectedMessageIds, messageId]
+  }
+
+  function selectAllMessages(checked) {
+    const messages = data.messages ?? []
+    selectedMessageIds = checked
+      ? [...new Set([...selectedMessageIds, ...messages.map((message) => message.id)])]
+      : selectedMessageIds.filter((id) => !messages.some((message) => message.id === id))
+  }
+
+  function toggleVendorSelection(vendorId) {
+    selectedVendorIds = selectedVendorIds.includes(vendorId)
+      ? selectedVendorIds.filter((id) => id !== vendorId)
+      : [...selectedVendorIds, vendorId]
+  }
+
+  function selectAllVendors(checked) {
+    const vendors = data.vendors ?? []
+    selectedVendorIds = checked
+      ? [...new Set([...selectedVendorIds, ...vendors.map((vendor) => vendor.id)])]
+      : selectedVendorIds.filter((id) => !vendors.some((vendor) => vendor.id === id))
+  }
+
   function requestBulkDelete(type) {
-    const ids = type === 'guests' ? visibleSelectedGuestIds : visibleSelectedGiftIds
+    const ids = ({ guests: visibleSelectedGuestIds, gifts: visibleSelectedGiftIds, messages: visibleSelectedMessageIds, vendors: visibleSelectedVendorIds })[type] ?? []
     if (!ids.length) return
     bulkDeleteRequest = { type, ids }
+  }
+
+  function bulkDeleteTitle(request) {
+    const labels = { guests: 'guests', gifts: 'gifts', messages: 'messages', vendors: 'vendors' }
+    return `Delete ${request.ids.length} selected ${labels[request.type] ?? 'items'}?`
+  }
+
+  function bulkDeleteMessage(type) {
+    if (type === 'guests') return 'Selected guests will be removed from the guest list and seating. Their gift records will remain, but will no longer be linked to a guest.'
+    if (type === 'vendors') return 'Selected vendors and all of their saved contact, cost and booking details will be permanently removed.'
+    if (type === 'messages') return 'Selected guest messages will be permanently removed.'
+    return 'Selected gift records will be permanently removed.'
   }
 
   function confirmBulkDelete() {
@@ -195,10 +242,18 @@
       }
       selectedGuestIds = selectedGuestIds.filter((id) => !deletedIds.has(id))
       onNotify(`${ids.length} selected ${ids.length === 1 ? 'guest' : 'guests'} removed.`)
-    } else {
+    } else if (type === 'gifts') {
       data = { ...data, gifts: data.gifts.filter((gift) => !deletedIds.has(gift.id)) }
       selectedGiftIds = selectedGiftIds.filter((id) => !deletedIds.has(id))
       onNotify(`${ids.length} selected ${ids.length === 1 ? 'gift' : 'gifts'} removed.`)
+    } else if (type === 'messages') {
+      data = { ...data, messages: (data.messages ?? []).filter((message) => !deletedIds.has(message.id)) }
+      selectedMessageIds = selectedMessageIds.filter((id) => !deletedIds.has(id))
+      onNotify(`${ids.length} selected ${ids.length === 1 ? 'message' : 'messages'} removed.`)
+    } else if (type === 'vendors') {
+      data = { ...data, vendors: (data.vendors ?? []).filter((vendor) => !deletedIds.has(vendor.id)) }
+      selectedVendorIds = selectedVendorIds.filter((id) => !deletedIds.has(id))
+      onNotify(`${ids.length} selected ${ids.length === 1 ? 'vendor' : 'vendors'} removed.`)
     }
     bulkDeleteRequest = null
   }
@@ -702,11 +757,34 @@
 
   function removeVendor(vendorId) {
     data = { ...data, vendors: (data.vendors ?? []).filter((vendor) => vendor.id !== vendorId) }
+    selectedVendorIds = selectedVendorIds.filter((id) => id !== vendorId)
+    vendorToDelete = null
     onNotify('Vendor removed.')
   }
 
-  function vendorStatusLabel(status) {
-    return ({ researching: 'Researching', contacted: 'Contacted', quoted: 'Quote received', booked: 'Booked', paid: 'Paid' })[status] ?? 'Researching'
+  function updateVendor(vendorId, changes) {
+    data = { ...data, vendors: (data.vendors ?? []).map((vendor) => vendor.id === vendorId ? { ...vendor, ...changes } : vendor) }
+  }
+
+  function vendorWebsiteHref(website) {
+    if (!website) return ''
+    return /^https?:\/\//i.test(website) ? website : `https://${website}`
+  }
+
+  function updateMessage(messageId, changes) {
+    data = { ...data, messages: (data.messages ?? []).map((message) => message.id === messageId ? { ...message, ...changes } : message) }
+  }
+
+  function removeMessage(messageId) {
+    data = { ...data, messages: (data.messages ?? []).filter((message) => message.id !== messageId) }
+    selectedMessageIds = selectedMessageIds.filter((id) => id !== messageId)
+    onNotify('Message deleted.')
+  }
+
+  function formatMessageDate(value) {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return 'Unknown date'
+    return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date)
   }
 
   function giftLabel(gift) {
@@ -1100,19 +1178,19 @@
         <section class="dashboard-view" aria-labelledby="guests-heading">
           <header class="dashboard-page-heading">
             <div><h1 id="guests-heading">Guest list</h1><p>Keep every invitation, reply and dietary note together.</p></div>
+            <label class="guest-heading-search">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg>
+              <input bind:value={guestSearch} placeholder="Search guests" aria-label="Search guests or email" />
+              <span aria-label={`${filteredGuests.length} guests shown`}>{filteredGuests.length}</span>
+            </label>
           </header>
 
           <div class="rsvp-stat-grid"><button class:active={rsvpFilter === 'all'} onclick={() => (rsvpFilter = 'all')} type="button"><span>All guests</span><strong>{summary.total}</strong></button><button class:active={rsvpFilter === 'attending'} onclick={() => (rsvpFilter = 'attending')} type="button"><span>Attending</span><strong>{summary.attending}</strong></button><button class:active={rsvpFilter === 'pending'} onclick={() => (rsvpFilter = 'pending')} type="button"><span>Awaiting reply</span><strong>{summary.pending}</strong></button><button class:active={rsvpFilter === 'declined'} onclick={() => (rsvpFilter = 'declined')} type="button"><span>Declined</span><strong>{summary.declined}</strong></button></div>
-
-          <div class="dashboard-toolbar dashboard-guest-toolbar">
-            <label class="dashboard-search"><span aria-hidden="true">⌕</span><input bind:value={guestSearch} placeholder="Search guests or email" aria-label="Search guests" /></label>
-            <span>{filteredGuests.length} guests shown</span>
-          </div>
           {#if visibleSelectedGuestIds.length > 0}
             <div class="bulk-action-toolbar" role="toolbar" aria-label="Selected guest actions">
               <span>{visibleSelectedGuestIds.length} selected</span>
               <label class="bulk-rsvp-control"><select aria-label="Change RSVP for selected guests" onchange={(event) => updateSelectedGuestStatus(event.currentTarget.value)}><option value="" selected disabled>RSVP</option><option value="attending">Attending</option><option value="pending">Pending</option><option value="declined">Declined</option></select></label>
-              <button type="button" class="bulk-delete-button" onclick={() => requestBulkDelete('guests')}>Delete selected</button>
+              <button type="button" class="bulk-delete-button" aria-label="Delete selected guests" title="Delete selected" onclick={() => requestBulkDelete('guests')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button>
             </div>
           {/if}
 
@@ -1345,13 +1423,7 @@
       {:else if active === 'gifts'}
         <section class="dashboard-view" aria-labelledby="gifts-heading">
           <header class="dashboard-page-heading"><div><h1 id="gifts-heading">Gift list</h1><p>Track monetary gifts and meaningful items, linked directly to your guests.</p></div></header>
-          <div class="gift-summary"><span><strong>{data.gifts.length}</strong> gifts received</span><span><strong>{data.gifts.filter((gift) => gift.thanked).length}</strong> thank-yous sent</span><i style={`--progress:${(data.gifts.filter((gift) => gift.thanked).length / Math.max(1, data.gifts.length)) * 100}%`}></i></div>
-          {#if visibleSelectedGiftIds.length > 0}
-            <div class="bulk-action-toolbar" role="toolbar" aria-label="Selected gift actions">
-              <span>{visibleSelectedGiftIds.length} selected</span>
-              <button type="button" class="bulk-delete-button" onclick={() => requestBulkDelete('gifts')}>Delete selected</button>
-            </div>
-          {/if}
+          <div class="gift-summary"><span><strong>{data.gifts.length}</strong> gifts received</span><span><strong>{data.gifts.filter((gift) => gift.thanked).length}</strong> thank-yous sent</span>{#if visibleSelectedGiftIds.length > 0}<div class="summary-bulk-actions" role="toolbar" aria-label="Selected gift actions"><span>{visibleSelectedGiftIds.length} selected</span><button type="button" class="bulk-delete-button" aria-label="Delete selected gifts" title="Delete selected" onclick={() => requestBulkDelete('gifts')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}<i style={`--progress:${(data.gifts.filter((gift) => gift.thanked).length / Math.max(1, data.gifts.length)) * 100}%`}></i></div>
           <div class="dashboard-table-wrap">
             <table class="dashboard-data-table dashboard-gift-table">
               <thead><tr><th><div class="bulk-header-cell"><input class="bulk-select-checkbox" use:setIndeterminate={someGiftsSelected} type="checkbox" checked={allGiftsSelected} onchange={(event) => selectAllGifts(event.currentTarget.checked)} aria-label="Select all gifts" /><span>Guest</span></div></th><th>Gift type</th><th>Amount or gift</th><th>Note</th><th>Thank you</th><th class="table-actions-heading"><span class="sr-only">Actions</span><div class="table-header-actions"><button class="guest-add-icon dashboard-primary" type="button" onclick={() => openGiftForm()}> <span aria-hidden="true">+</span> Add</button><button class="csv-download-button" type="button" onclick={downloadGiftCsv} aria-label="Download CSV" data-tooltip="Download CSV" title="Download CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></th></tr></thead>
@@ -1366,16 +1438,93 @@
                     <td><div class="inline-row-actions"><button type="button" onclick={addGift}>Save</button><button type="button" onclick={() => (showGiftForm = false)}>Cancel</button></div></td>
                   </tr>
                 {/if}
-                {#each data.gifts as gift}<tr class:thanked={gift.thanked}><td><input class="bulk-select-checkbox" type="checkbox" checked={selectedGiftIds.includes(gift.id)} onchange={() => toggleGiftSelection(gift.id)} aria-label={`Select gift from ${gift.guest}`} /><i class={avatarTone(gift.guestId || gift.guest)}>{gift.guest.slice(0, 1)}</i><span><strong>{gift.guest}</strong><small>{gift.guestId ? 'Guest list' : 'Not on guest list'}</small></span></td><td><span class={`gift-type gift-type--${gift.type}`}>{gift.type === 'money' ? 'Money' : 'Item'}</span></td><td><strong class="gift-value">{giftLabel(gift)}</strong></td><td><span class="gift-note">{gift.note || 'No note added'}</span></td><td><button class="gift-thank-toggle" class:active={gift.thanked} type="button" onclick={() => toggleThanked(gift.id)} aria-pressed={gift.thanked}><i>{gift.thanked ? '✓' : ''}</i>{gift.thanked ? 'Thanked' : 'Pending'}</button></td><td><button class="dashboard-row-remove" type="button" onclick={() => removeGift(gift.id)} aria-label={`Remove gift from ${gift.guest}`}>×</button></td></tr>{/each}
+                {#each data.gifts as gift}<tr class:thanked={gift.thanked}><td><input class="bulk-select-checkbox" type="checkbox" checked={selectedGiftIds.includes(gift.id)} onchange={() => toggleGiftSelection(gift.id)} aria-label={`Select gift from ${gift.guest}`} /><i class={avatarTone(gift.guestId || gift.guest)}>{gift.guest.slice(0, 1)}</i><span><strong>{gift.guest}</strong><small>{gift.guestId ? 'Guest list' : 'Not on guest list'}</small></span></td><td><span class={`gift-type gift-type--${gift.type}`}>{gift.type === 'money' ? 'Money' : 'Item'}</span></td><td><strong class="gift-value">{giftLabel(gift)}</strong></td><td><span class="gift-note">{gift.note || 'No note added'}</span></td><td><button class="gift-thank-toggle" class:active={gift.thanked} type="button" onclick={() => toggleThanked(gift.id)} aria-pressed={gift.thanked}><i>{gift.thanked ? '✓' : ''}</i>{gift.thanked ? 'Thanked' : 'Pending'}</button></td><td><button class="dashboard-row-remove" type="button" onclick={() => removeGift(gift.id)} aria-label={`Remove gift from ${gift.guest}`}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></td></tr>{/each}
               </tbody>
             </table>
           </div>
         </section>
 
-      {:else if active === 'music' || active === 'vendors' || active === 'messages'}
+      {:else if active === 'music'}
         <section class="dashboard-view" aria-labelledby={`${active}-heading`}>
           <header class="dashboard-page-heading"><div><h1 id={`${active}-heading`}>{navItems.find((item) => item.id === active)?.label}</h1></div></header>
           <section class="dashboard-panel"><p>Coming soon</p></section>
+        </section>
+
+      {:else if active === 'messages'}
+        <section class="dashboard-view" aria-labelledby="messages-heading">
+          <header class="dashboard-page-heading">
+            <div><h1 id="messages-heading">Messages</h1><p>Read the notes your guests leave through your event website.</p></div>
+          </header>
+
+          <div class="message-summary"><span><strong>{(data.messages ?? []).length}</strong> messages</span><span><strong>{(data.messages ?? []).filter((message) => !message.read).length}</strong> unread</span>{#if visibleSelectedMessageIds.length > 0}<div class="summary-bulk-actions" role="toolbar" aria-label="Selected message actions"><span>{visibleSelectedMessageIds.length} selected</span><button type="button" class="bulk-delete-button" aria-label="Delete selected messages" title="Delete selected" onclick={() => requestBulkDelete('messages')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div>
+
+          <div class="dashboard-table-wrap">
+            <table class="dashboard-data-table dashboard-message-table">
+              <thead><tr><th><div class="bulk-header-cell"><input class="bulk-select-checkbox" use:setIndeterminate={someMessagesSelected} type="checkbox" checked={allMessagesSelected} onchange={(event) => selectAllMessages(event.currentTarget.checked)} aria-label="Select all messages" /><span>Guest</span></div></th><th>Date sent</th><th>Contact details</th><th>Message</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead>
+              <tbody>
+                {#each data.messages ?? [] as message (message.id)}
+                  <tr class:unread={!message.read}>
+                    <td><input class="bulk-select-checkbox" type="checkbox" checked={selectedMessageIds.includes(message.id)} onchange={() => toggleMessageSelection(message.id)} aria-label={`Select message from ${message.name}`} /><i class={avatarTone(message.guestId || message.name)}>{message.name.slice(0, 1)}</i><span><strong>{message.name}</strong><small>{message.guestId ? 'Guest list' : 'Website visitor'}</small></span></td>
+                    <td><time datetime={message.sentAt}>{formatMessageDate(message.sentAt)}</time></td>
+                    <td><span class="message-contact">{#if message.email}<a href={`mailto:${message.email}`}>{message.email}</a>{/if}{#if message.phone}<a href={`tel:${message.phone}`}>{message.phone}</a>{/if}{#if !message.email && !message.phone}<small>No contact details</small>{/if}</span></td>
+                    <td><p class="message-copy">{message.message}</p></td>
+                    <td><button class:active={message.read} class="message-read-toggle" type="button" aria-pressed={message.read} onclick={() => updateMessage(message.id, { read: !message.read })}><i>{message.read ? '✓' : ''}</i>{message.read ? 'Read' : 'Mark as read'}</button></td>
+                    <td><button class="dashboard-row-remove" type="button" aria-label={`Delete message from ${message.name}`} onclick={() => removeMessage(message.id)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></td>
+                  </tr>
+                {:else}
+                  <tr class="message-empty-row"><td colspan="6"><p>No guest messages yet. Messages submitted through your website will appear here.</p></td></tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+      {:else if active === 'vendors'}
+        <section class="dashboard-view" aria-labelledby="vendors-heading">
+          <header class="dashboard-page-heading">
+            <div><h1 id="vendors-heading">Vendors</h1><p>Keep every supplier, contact, quote and booking detail together.</p></div>
+            <button class="dashboard-primary" type="button" onclick={() => (showVendorForm = true)}>+ Add vendor</button>
+          </header>
+
+          <div class="vendor-summary"><span><strong>{(data.vendors ?? []).length}</strong> vendors</span><span><strong>{(data.vendors ?? []).filter((vendor) => ['booked', 'paid'].includes(vendor.status)).length}</strong> booked</span><span><strong>€{(data.vendors ?? []).reduce((total, vendor) => total + (Number(vendor.cost) || 0), 0).toLocaleString()}</strong> estimated total</span>{#if visibleSelectedVendorIds.length > 0}<div class="summary-bulk-actions" role="toolbar" aria-label="Selected vendor actions"><span>{visibleSelectedVendorIds.length} selected</span><button type="button" class="bulk-delete-button" aria-label="Delete selected vendors" title="Delete selected" onclick={() => requestBulkDelete('vendors')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div>
+
+          <div class="dashboard-table-wrap">
+            <table class="dashboard-data-table dashboard-vendor-table">
+              <thead><tr><th><div class="bulk-header-cell"><input class="bulk-select-checkbox" use:setIndeterminate={someVendorsSelected} type="checkbox" checked={allVendorsSelected} onchange={(event) => selectAllVendors(event.currentTarget.checked)} aria-label="Select all vendors" /><span>Vendor</span></div></th><th>Category</th><th>Contact</th><th>Budget</th><th>Status</th><th>Notes</th><th><span class="sr-only">Actions</span></th></tr></thead>
+              <tbody>
+                {#if showVendorForm}
+                  <tr class="vendor-form-row"><td colspan="7">
+                    <form class="vendor-inline-form" onsubmit={addVendor}>
+                      <label><span>Vendor or company *</span><input bind:value={vendorForm.name} required placeholder="Company name" /></label>
+                      <label><span>Category</span><select bind:value={vendorForm.category}><option>Venue</option><option>Catering</option><option>Photography</option><option>Videography</option><option>Flowers</option><option>Music / DJ</option><option>Decor</option><option>Transport</option><option>Entertainment</option><option>Beauty</option><option>Stationery</option><option>Other</option></select></label>
+                      <label><span>Contact person</span><input bind:value={vendorForm.contact} placeholder="Full name" /></label>
+                      <label><span>Email</span><input bind:value={vendorForm.email} type="email" placeholder="hello@example.com" /></label>
+                      <label><span>Phone</span><input bind:value={vendorForm.phone} type="tel" placeholder="Phone number" /></label>
+                      <label><span>Website</span><input bind:value={vendorForm.website} type="text" placeholder="example.com" /></label>
+                      <label><span>Estimated cost (€)</span><input bind:value={vendorForm.cost} type="number" min="0" step="0.01" placeholder="0" /></label>
+                      <label><span>Deposit paid (€)</span><input bind:value={vendorForm.deposit} type="number" min="0" step="0.01" placeholder="0" /></label>
+                      <label><span>Status</span><select bind:value={vendorForm.status}><option value="researching">Researching</option><option value="contacted">Contacted</option><option value="quoted">Quote received</option><option value="booked">Booked</option><option value="paid">Paid</option></select></label>
+                      <label class="vendor-note-field"><span>Notes</span><textarea bind:value={vendorForm.note} rows="2" placeholder="Package details, next steps, reminders…"></textarea></label>
+                      <div class="vendor-form-actions"><button class="dashboard-primary" type="submit">Save vendor</button><button class="dashboard-secondary" type="button" onclick={() => (showVendorForm = false)}>Cancel</button></div>
+                    </form>
+                  </td></tr>
+                {/if}
+                {#each data.vendors ?? [] as vendor (vendor.id)}
+                  <tr>
+                    <td><input class="bulk-select-checkbox" type="checkbox" checked={selectedVendorIds.includes(vendor.id)} onchange={() => toggleVendorSelection(vendor.id)} aria-label={`Select ${vendor.name}`} /><span class="vendor-name"><strong>{vendor.name}</strong>{#if vendor.website}<a href={vendorWebsiteHref(vendor.website)} target="_blank" rel="noreferrer">{vendor.website}</a>{/if}</span></td>
+                    <td><span class="vendor-category">{vendor.category}</span></td>
+                    <td><span class="vendor-contact"><strong>{vendor.contact || 'No contact name'}</strong>{#if vendor.email}<a href={`mailto:${vendor.email}`}>{vendor.email}</a>{/if}{#if vendor.phone}<a href={`tel:${vendor.phone}`}>{vendor.phone}</a>{/if}</span></td>
+                    <td><span class="vendor-budget"><strong>{vendor.cost ? `€${Number(vendor.cost).toLocaleString()}` : 'Not set'}</strong><small>{vendor.deposit ? `€${Number(vendor.deposit).toLocaleString()} deposit` : 'No deposit recorded'}</small></span></td>
+                    <td><select class={`vendor-status vendor-status--${vendor.status}`} value={vendor.status} aria-label={`Status for ${vendor.name}`} onchange={(event) => updateVendor(vendor.id, { status: event.currentTarget.value })}><option value="researching">Researching</option><option value="contacted">Contacted</option><option value="quoted">Quote received</option><option value="booked">Booked</option><option value="paid">Paid</option></select></td>
+                    <td><span class="vendor-note">{vendor.note || 'No notes'}</span></td>
+                    <td><button class="dashboard-row-remove" type="button" aria-label={`Remove ${vendor.name}`} onclick={() => (vendorToDelete = vendor)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></td>
+                  </tr>
+                {:else}
+                  {#if !showVendorForm}<tr class="vendor-empty-row"><td colspan="7"><p>No vendors added yet. Add your first supplier to start tracking plans and costs.</p></td></tr>{/if}
+                {/each}
+              </tbody>
+            </table>
+          </div>
         </section>
 
       {:else if active === 'notes'}
@@ -1458,12 +1607,22 @@
   />
 {/if}
 
+{#if vendorToDelete}
+  <ConfirmDialog
+    title="Delete this vendor?"
+    message={`Are you sure you want to delete ${vendorToDelete.name} and all of its saved contact, cost and booking details?`}
+    confirmLabel="Delete vendor"
+    cancelLabel="Keep vendor"
+    tone="danger"
+    onConfirm={() => removeVendor(vendorToDelete.id)}
+    onCancel={() => (vendorToDelete = null)}
+  />
+{/if}
+
 {#if bulkDeleteRequest}
   <ConfirmDialog
-    title={`Delete ${bulkDeleteRequest.ids.length} ${bulkDeleteRequest.type === 'guests' ? 'selected guests' : 'selected gifts'}?`}
-    message={bulkDeleteRequest.type === 'guests'
-      ? 'Selected guests will be removed from the guest list and seating. Their gift records will remain, but will no longer be linked to a guest.'
-      : 'Selected gift records will be permanently removed.'}
+    title={bulkDeleteTitle(bulkDeleteRequest)}
+    message={bulkDeleteMessage(bulkDeleteRequest.type)}
     confirmLabel="Delete selected"
     cancelLabel="Cancel"
     tone="danger"

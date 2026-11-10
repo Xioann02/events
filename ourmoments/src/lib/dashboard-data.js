@@ -38,7 +38,12 @@ export function createDashboardData(site) {
     ],
     floorPlan: { shapes: [], tableShape: 'round' },
     notesBoard: { items: [] },
-    vendors: [],
+    vendors: [createSampleVendor()],
+    vendorExampleAdded: true,
+    messages: [
+      createSampleMessage(guests[0]),
+      { id: id('message'), guestId: guestId('Marcus Cole'), name: 'Marcus Cole', email: 'marcus@example.com', phone: '+357 96 234567', message: 'Thank you for the invitation. Looking forward to the big day!', sentAt: new Date(Date.now() - 1000 * 60 * 60 * 26).toISOString(), read: true },
+    ],
     guests,
     gifts: [
       { id: id('gift'), guestId: guestId('Elena Marin'), guest: 'Elena Marin', type: 'item', amount: '', currency: 'EUR', gift: 'Handmade ceramic serving bowl', note: 'For all the dinners ahead.', thanked: true },
@@ -55,6 +60,19 @@ export function createDashboardData(site) {
       { id: id('activity'), text: 'Marcus uploaded a photo', time: '1 hour ago', tone: 'neutral' },
       { id: id('activity'), text: 'Amelia opened the invitation', time: 'Yesterday', tone: 'neutral' },
     ],
+  }
+}
+
+export function createSampleMessage(guest = {}) {
+  return {
+    id: id('message'),
+    guestId: guest.id ?? '',
+    name: guest.name || 'Elena Marin',
+    email: guest.email || 'elena@example.com',
+    phone: guest.phone || '+357 99 123456',
+    message: 'We are so excited to celebrate with you. Everything looks beautiful!',
+    sentAt: new Date(Date.now() - 1000 * 60 * 42).toISOString(),
+    read: false,
   }
 }
 
@@ -109,6 +127,21 @@ export function createVendor(values) {
     status: values.status || 'researching',
     note: values.note?.trim() ?? '',
   }
+}
+
+export function createSampleVendor() {
+  return createVendor({
+    name: 'Olive & Stone Events',
+    category: 'Venue',
+    contact: 'Sofia Andreou',
+    email: 'sofia@oliveandstone.example',
+    phone: '+357 99 654321',
+    website: 'oliveandstone.example',
+    cost: '4800',
+    deposit: '1200',
+    status: 'booked',
+    note: 'Venue hire includes tables, chairs, lighting and day-of coordination.',
+  })
 }
 
 export function dashboardSummary(data) {

@@ -7,7 +7,7 @@
   import EditorShell from './lib/components/EditorShell.svelte'
   import PreviewModal from './lib/components/PreviewModal.svelte'
   import Storefront from './lib/components/Storefront.svelte'
-  import { createDashboardData } from './lib/dashboard-data.js'
+  import { createDashboardData, createSampleMessage, createSampleVendor } from './lib/dashboard-data.js'
   import { getPlan } from './lib/plans.js'
   import { cartTotal, createCartItem, createDraft, createPlanCartItem, adaptDraftToOccasion } from './lib/draft.js'
 
@@ -50,6 +50,11 @@
         dashboardData = {
           ...savedDashboard,
           guests,
+          messages: Array.isArray(savedDashboard.messages) ? savedDashboard.messages : [createSampleMessage(guests[0])],
+          vendors: savedDashboard.vendorExampleAdded
+            ? (savedDashboard.vendors ?? [])
+            : [...(savedDashboard.vendors ?? []), createSampleVendor()],
+          vendorExampleAdded: true,
           tables: (savedDashboard.tables ?? []).map((table, index) => ({ ...table, name: `Table ${index + 1}` })),
           gifts: (savedDashboard.gifts ?? []).map((gift) => {
             const isMoney = gift.type === 'money' || Boolean(gift.amount)
