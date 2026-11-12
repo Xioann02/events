@@ -104,8 +104,9 @@
   align-content: start;
   gap: 3px;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
+.dashboard-nav::-webkit-scrollbar { display: none; width: 0; height: 0; }
 .dashboard-nav button {
   width: 100%;
   min-height: 42px;
@@ -336,8 +337,8 @@
 .dashboard-data-table .bulk-select-checkbox:focus-visible { outline: 2px solid var(--dash-accent); outline-offset: 2px; }
 .dashboard-data-table .bulk-select-checkbox:checked { opacity: 1; }
 .dashboard-data-table { width: 100%; border-collapse: collapse; }
-.dashboard-data-table th { padding: 15px 17px; color: #4f4b44; background: #fff; font-size: max(14px, .66rem); letter-spacing: .1em; text-align: left; text-transform: uppercase; }
-.dashboard-guest-table th { font-size: max(14px, .72rem); letter-spacing: .08em; }
+.dashboard-data-table th { padding: 15px 17px; color: #4f4b44; background: #fff; font-size: max(13px, .62rem); letter-spacing: .1em; text-align: left; text-transform: uppercase; }
+.dashboard-guest-table th { font-size: max(13px, .67rem); letter-spacing: .08em; }
 .guest-sort-button { display: inline-flex; padding: 0; border: 0; color: inherit; background: transparent; align-items: center; gap: 7px; font: inherit; letter-spacing: inherit; text-align: left; text-transform: inherit; cursor: pointer; }
 .guest-sort-button span { color: var(--dash-accent); font-size: max(14px, .75rem); opacity: 0; transition: opacity 160ms ease; }
 .guest-sort-button:hover span,
