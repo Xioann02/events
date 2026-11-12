@@ -2,6 +2,7 @@
   import { tick } from 'svelte'
   import { formatEventDate, getTemplate } from '../catalog.js'
   import { createGift, createGuest, createSong, createTable, createVendor, dashboardSummary } from '../dashboard-data.js'
+  import { fetchMusicMetadata, musicFallbackUrl, parseMusicLink } from '../music-embeds.js'
   import couplePhoto from '../../assets/modern-couple.jpg'
   import tablePhoto from '../../assets/reception-table.jpg'
   import stillLifePhoto from '../../assets/editorial-still-life.jpg'
@@ -80,6 +81,10 @@
   let calendarCursor = $state(new Date())
   let selectedDayKey = $state(formatCalendarDate(new Date()))
   let notesSectionsCollapsed = $state({ calendar: false, day: false, fixed: false })
+  let noteFormattingState = $state({})
+  let activeGeneralNoteId = $state('')
+  let draggedGeneralNoteId = $state('')
+  let dragOverGeneralNoteId = $state('')
   let calendarEventFormOpen = $state(false)
   let calendarEventForm = $state({ title: '', time: '' })
   let copied = $state(false)
@@ -88,6 +93,11 @@
   let tableForm = $state({ capacity: 8 })
   let giftForm = $state({ guestId: '', guest: '', type: 'money', amount: '', currency: 'EUR', gift: '', note: '' })
   let musicForm = $state({ name: '', link: '', type: 'other' })
+  let musicLinkError = $state('')
+  let musicMetadataLoading = $state(false)
+  let musicSaving = $state(false)
+  let openMusicPlayerId = $state('')
+  let musicMetadataTimer
   let vendorForm = $state({ name: '', category: 'Venue', contact: '', email: '', phone: '', website: '', cost: '', deposit: '', status: 'researching', note: '' })
 
   let summary = $derived(dashboardSummary(data))
@@ -108,6 +118,7 @@
   })
   let selectedDayEvents = $derived((data.notesCalendar?.events ?? []).filter((event) => event.date === selectedDayKey).sort((a, b) => (a.time || '').localeCompare(b.time || '')))
   let calendarMonthLabel = $derived(calendarCursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }))
+  let detectedMusicLink = $derived(parseMusicLink(musicForm.link))
   let visibleSelectedGuestIds = $derived(sortedGuests.filter((guest) => selectedGuestIds.includes(guest.id)).map((guest) => guest.id))
   let allVisibleGuestsSelected = $derived(sortedGuests.length > 0 && visibleSelectedGuestIds.length === sortedGuests.length)
   let someVisibleGuestsSelected = $derived(visibleSelectedGuestIds.length > 0 && !allVisibleGuestsSelected)
@@ -363,6 +374,10 @@
 
   function closeGuestMenuFromOutside(event) {
     if (!event.target.closest?.('.guest-action-menu')) openGuestMenuId = ''
+    if (!event.target.closest?.('.general-note-card')) {
+      if (document.activeElement?.closest?.('.general-note-card')) document.activeElement.blur()
+      activeGeneralNoteId = ''
+    }
   }
 
   function loadGuestEditForm(guest) {
@@ -918,20 +933,57 @@
   }
 
   function songTypeLabel(type) {
-    return ({ entrance: 'Entrance', 'first-dance': 'First dance', party: 'Party', reception: 'Reception', other: 'Other' })[type] ?? 'Other'
+    return ({ entrance: 'Entrance', 'first-dance': 'First dance', 'parent-dance': 'Parent dance', 'cake-cutting': 'Cake cutting', party: 'Party', reception: 'Reception', other: 'Other' })[type] ?? 'Other'
   }
 
-  function addSong(event) {
+  function musicMetadataTitle(metadata) {
+    if (!metadata?.title) return ''
+    return metadata.artist && !metadata.title.toLowerCase().includes(metadata.artist.toLowerCase()) ? `${metadata.title} — ${metadata.artist}` : metadata.title
+  }
+
+  function scheduleMusicMetadataLookup() {
+    musicLinkError = ''
+    window.clearTimeout(musicMetadataTimer)
+    const link = musicForm.link.trim()
+    if (!link || musicForm.name.trim() || !parseMusicLink(link)) {
+      musicMetadataLoading = false
+      return
+    }
+    musicMetadataTimer = window.setTimeout(async () => {
+      const requestedLink = musicForm.link.trim()
+      musicMetadataLoading = true
+      const metadata = await fetchMusicMetadata(requestedLink)
+      if (musicForm.link.trim() === requestedLink && !musicForm.name.trim()) musicForm.name = musicMetadataTitle(metadata)
+      if (musicForm.link.trim() === requestedLink) musicMetadataLoading = false
+    }, 350)
+  }
+
+  async function addSong(event) {
     event.preventDefault()
-    if (!musicForm.name.trim()) return
-    data = { ...data, songs: [createSong(musicForm), ...(data.songs ?? [])] }
+    const link = musicForm.link.trim()
+    const music = link ? parseMusicLink(link) : null
+    if (!musicForm.name.trim() && !link) {
+      musicLinkError = 'Add a title or a music link.'
+      return
+    }
+    musicSaving = true
+    let name = musicForm.name.trim()
+    if (!name && music) name = musicMetadataTitle(await fetchMusicMetadata(link))
+    name ||= music ? `${music.platformLabel} ${music.kindLabel}` : 'Music link'
+    data = { ...data, songs: [createSong({ ...musicForm, name, platform: music?.platform ?? '', contentType: music?.kind ?? '' }), ...(data.songs ?? [])] }
     musicForm = { name: '', link: '', type: 'other' }
+    musicLinkError = ''
+    musicMetadataLoading = false
+    musicSaving = false
     showMusicForm = false
-    onNotify('Song added to your music list.')
+    onNotify(music ? `${music.kindLabel} added from ${music.platformLabel}.` : 'Music added to your list.')
   }
 
   function openMusicForm() {
     musicForm = { name: '', link: '', type: 'other' }
+    musicLinkError = ''
+    musicMetadataLoading = false
+    musicSaving = false
     showMusicForm = true
   }
 
@@ -944,6 +996,10 @@
   function songLinkHref(link) {
     if (!link) return ''
     return /^https?:\/\//i.test(link) ? link : `https://${link}`
+  }
+
+  function musicDetails(link) {
+    return parseMusicLink(link)
   }
 
   function addVendor(event) {
@@ -1162,6 +1218,11 @@
     notesSectionsCollapsed = { ...notesSectionsCollapsed, [section]: !notesSectionsCollapsed[section] }
   }
 
+  function toggleCalendarAndDaySections() {
+    const collapsed = !notesSectionsCollapsed.calendar
+    notesSectionsCollapsed = { ...notesSectionsCollapsed, calendar: collapsed, day: collapsed }
+  }
+
   function addCalendarEvent(event) {
     event.preventDefault()
     const title = calendarEventForm.title.trim()
@@ -1190,6 +1251,336 @@
 
   function updateFixedNotes(value) {
     updateNotesCalendar({ fixedNotes: value })
+  }
+
+  function escapeNoteText(value) {
+    return String(value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;')
+      .replaceAll('\n', '<br>')
+  }
+
+  function generalNotesData() {
+    const notes = notesCalendarData()
+    if (Array.isArray(notes.generalNotes)) {
+      return notes.generalNotes.map((note) => {
+        if (!note.checkpoints?.length) return note
+        const checklist = note.checkpoints.map((checkpoint) => `<div data-checkpoint="true"><input type="checkbox"${checkpoint.checked ? ' checked' : ''}><span data-checkpoint-text="true">${escapeNoteText(checkpoint.text)}</span></div>`).join('')
+        return { ...note, content: `${note.content || ''}${checklist}`, checkpoints: [] }
+      })
+    }
+    if (!notes.fixedNotes?.trim()) return []
+    return [{ id: 'legacy-general-note', title: 'General note', color: 'yellow', content: escapeNoteText(notes.fixedNotes), checkpoints: [] }]
+  }
+
+  function updateGeneralNotes(generalNotes) {
+    updateNotesCalendar({ generalNotes, fixedNotes: '' })
+  }
+
+  async function addGeneralNote() {
+    const note = {
+      id: `general-note-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`,
+      title: '',
+      color: 'yellow',
+      content: '',
+    }
+    updateGeneralNotes([...generalNotesData(), note])
+    notesSectionsCollapsed = { ...notesSectionsCollapsed, fixed: false }
+    activeGeneralNoteId = note.id
+    await tick()
+    document.getElementById(`general-note-title-${note.id}`)?.focus()
+  }
+
+  function updateGeneralNote(noteId, changes) {
+    updateGeneralNotes(generalNotesData().map((note) => note.id === noteId ? { ...note, ...changes } : note))
+  }
+
+  function removeGeneralNote(noteId) {
+    updateGeneralNotes(generalNotesData().filter((note) => note.id !== noteId))
+    if (activeGeneralNoteId === noteId) activeGeneralNoteId = ''
+  }
+
+  function generalNoteAutoFullWidth(noteId) {
+    const halfWidthNotes = generalNotesData().filter((note) => !note.fullWidth)
+    return halfWidthNotes.length % 2 === 1 && halfWidthNotes.at(-1)?.id === noteId
+  }
+
+  function startGeneralNoteDrag(event, noteId) {
+    draggedGeneralNoteId = noteId
+    dragOverGeneralNoteId = ''
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', noteId)
+    const card = event.currentTarget.closest('.general-note-card')
+    if (card) {
+      const bounds = card.getBoundingClientRect()
+      event.dataTransfer.setDragImage(card, Math.max(0, bounds.width - 14), bounds.height / 2)
+    }
+  }
+
+  function dropGeneralNote(event, targetId) {
+    event.preventDefault()
+    const sourceId = draggedGeneralNoteId || event.dataTransfer.getData('text/plain')
+    if (!sourceId || sourceId === targetId) {
+      draggedGeneralNoteId = ''
+      dragOverGeneralNoteId = ''
+      return
+    }
+    const notes = generalNotesData()
+    const source = notes.find((note) => note.id === sourceId)
+    const target = notes.find((note) => note.id === targetId)
+    if (!source || !target) return
+    const reordered = notes.filter((note) => note.id !== sourceId)
+    const targetIndex = reordered.findIndex((note) => note.id === targetId)
+    const card = event.currentTarget
+    const bounds = card.getBoundingClientRect()
+    const grid = card.parentElement
+    const isFullWidth = bounds.width > grid.getBoundingClientRect().width * .75
+    const insertAfter = isFullWidth ? event.clientY > bounds.top + bounds.height / 2 : event.clientX > bounds.left + bounds.width / 2
+    reordered.splice(targetIndex + (insertAfter ? 1 : 0), 0, source)
+    updateGeneralNotes(reordered)
+    draggedGeneralNoteId = ''
+    dragOverGeneralNoteId = ''
+  }
+
+  function finishGeneralNoteDrag() {
+    draggedGeneralNoteId = ''
+    dragOverGeneralNoteId = ''
+  }
+
+  function sanitizeNoteHtml(value) {
+    const template = document.createElement('template')
+    template.innerHTML = value || ''
+    const allowed = new Set(['B', 'BR', 'DIV', 'EM', 'FONT', 'I', 'INPUT', 'P', 'SPAN', 'STRONG', 'U'])
+    for (const element of [...template.content.querySelectorAll('*')]) {
+      if (!allowed.has(element.tagName)) {
+        element.replaceWith(...element.childNodes)
+        continue
+      }
+      if (element.tagName === 'INPUT' && element.getAttribute('type') !== 'checkbox') {
+        element.remove()
+        continue
+      }
+      const color = element.tagName === 'FONT' ? element.getAttribute('color') : null
+      const size = element.tagName === 'FONT' ? element.getAttribute('size') : null
+      const isCheckpoint = element.tagName === 'DIV' && element.hasAttribute('data-checkpoint')
+      const isCheckpointText = element.tagName === 'SPAN' && (element.hasAttribute('data-checkpoint-text') || element.parentElement?.hasAttribute('data-checkpoint'))
+      const isChecked = element.tagName === 'INPUT' && element.hasAttribute('checked')
+      for (const attribute of [...element.attributes]) element.removeAttribute(attribute.name)
+      if (color && /^(#[0-9a-f]{3,8}|rgb\([0-9 ,.]+\))$/i.test(color)) element.setAttribute('color', color)
+      if (size && /^[1-7]$/.test(size)) element.setAttribute('size', size)
+      if (isCheckpoint) element.setAttribute('data-checkpoint', 'true')
+      if (isCheckpointText) element.setAttribute('data-checkpoint-text', 'true')
+      if (element.tagName === 'INPUT') {
+        element.setAttribute('type', 'checkbox')
+        if (isChecked) element.setAttribute('checked', '')
+      }
+    }
+    for (const checkpoint of template.content.querySelectorAll('[data-checkpoint="true"]')) {
+      if (checkpoint.querySelector(':scope > [data-checkpoint-text="true"]')) continue
+      const text = document.createElement('span')
+      text.setAttribute('data-checkpoint-text', 'true')
+      for (const child of [...checkpoint.childNodes]) {
+        if (!(child.nodeType === Node.ELEMENT_NODE && child.matches('input[type="checkbox"]'))) text.append(child)
+      }
+      if (!text.hasChildNodes()) text.append(document.createTextNode('\u200b'))
+      checkpoint.append(text)
+    }
+    return template.innerHTML
+  }
+
+  function richTextEditor(node, content) {
+    node.innerHTML = sanitizeNoteHtml(content)
+    return {
+      update(nextContent) {
+        if (document.activeElement !== node) {
+          const safeContent = sanitizeNoteHtml(nextContent)
+          if (node.innerHTML !== safeContent) node.innerHTML = safeContent
+        }
+      },
+    }
+  }
+
+  function updateGeneralNoteContent(noteId, editor) {
+    updateGeneralNote(noteId, { content: sanitizeNoteHtml(editor.innerHTML) })
+  }
+
+  function applyGeneralNoteFormat(noteId, command, value = null) {
+    const editor = document.getElementById(`general-note-editor-${noteId}`)
+    if (!editor) return
+    editor.focus()
+    document.execCommand('styleWithCSS', false, false)
+    document.execCommand(command, false, value)
+    updateGeneralNoteContent(noteId, editor)
+    refreshGeneralNoteFormatting(noteId)
+  }
+
+  function refreshGeneralNoteFormatting(noteId) {
+    const editor = document.getElementById(`general-note-editor-${noteId}`)
+    const selection = window.getSelection()
+    if (!editor || !selection.rangeCount || !editor.contains(selection.anchorNode)) return
+    noteFormattingState = {
+      ...noteFormattingState,
+      [noteId]: {
+        bold: document.queryCommandState('bold'),
+        italic: document.queryCommandState('italic'),
+        underline: document.queryCommandState('underline'),
+        fontSize: String(document.queryCommandValue('fontSize') || '3'),
+        color: String(document.queryCommandValue('foreColor') || '').replaceAll(' ', '').toLowerCase(),
+      },
+    }
+  }
+
+  function noteFormatActive(noteId, format, value = true) {
+    const state = noteFormattingState[noteId] ?? {}
+    return state[format] === value
+  }
+
+  function noteColorActive(noteId, hex, rgb) {
+    const color = noteFormattingState[noteId]?.color ?? ''
+    return color === hex || color === rgb.replaceAll(' ', '').toLowerCase()
+  }
+
+  function insertGeneralNoteCheckpoint(noteId) {
+    const editor = document.getElementById(`general-note-editor-${noteId}`)
+    if (!editor) return
+    const checkpointId = `inline-checkpoint-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`
+    editor.focus()
+    document.execCommand('insertHTML', false, `<div data-checkpoint="true" data-new-checkpoint="${checkpointId}"><input type="checkbox"><span data-checkpoint-text="true">​</span></div>`)
+    const checkpoint = editor.querySelector(`[data-new-checkpoint="${checkpointId}"]`)
+    if (checkpoint) {
+      checkpoint.removeAttribute('data-new-checkpoint')
+      const text = checkpoint.querySelector('span')
+      placeCaretAtChecklistStart(text)
+    }
+    updateGeneralNoteContent(noteId, editor)
+  }
+
+  function handleGeneralNoteCheckboxClick(noteId, event) {
+    if (event.target.matches?.('input[type="checkbox"]')) {
+      event.target.toggleAttribute('checked', event.target.checked)
+      updateGeneralNoteContent(noteId, event.currentTarget)
+    }
+  }
+
+  function placeCaretInNote(node, atStart = false) {
+    const selection = window.getSelection()
+    const range = document.createRange()
+    range.selectNodeContents(node)
+    range.collapse(atStart)
+    selection.removeAllRanges()
+    selection.addRange(range)
+  }
+
+  function noteCaretIsAtStart(container, selection) {
+    if (!selection.rangeCount || !selection.isCollapsed) return false
+    const beforeCaret = document.createRange()
+    beforeCaret.selectNodeContents(container)
+    try {
+      beforeCaret.setEnd(selection.anchorNode, selection.anchorOffset)
+    } catch {
+      return false
+    }
+    return beforeCaret.toString().replace(/[\s\u200b]/g, '').length === 0
+  }
+
+  function placeCaretAtChecklistStart(text) {
+    let firstNode = text.firstChild
+    if (firstNode?.nodeType !== Node.TEXT_NODE || !firstNode.data.startsWith('\u200b')) {
+      firstNode = document.createTextNode('\u200b')
+      text.prepend(firstNode)
+    }
+    const selection = window.getSelection()
+    const range = document.createRange()
+    range.setStart(firstNode, 1)
+    range.collapse(true)
+    selection.removeAllRanges()
+    selection.addRange(range)
+  }
+
+  function checkpointFromCaret(editor, selection) {
+    const anchorNode = selection.anchorNode
+    if (!anchorNode) return null
+    const anchorElement = anchorNode.nodeType === Node.ELEMENT_NODE ? anchorNode : anchorNode.parentElement
+    const ancestorCheckpoint = anchorElement?.closest?.('[data-checkpoint="true"]')
+    if (ancestorCheckpoint && editor.contains(ancestorCheckpoint)) return ancestorCheckpoint
+    if (anchorNode.nodeType !== Node.ELEMENT_NODE) return null
+
+    const checkpointInside = (node, fromEnd) => {
+      let current = node
+      while (current?.childNodes?.length) current = current.childNodes[fromEnd ? current.childNodes.length - 1 : 0]
+      const element = current?.nodeType === Node.ELEMENT_NODE ? current : current?.parentElement
+      const checkpoint = element?.closest?.('[data-checkpoint="true"]')
+      return checkpoint && editor.contains(checkpoint) ? checkpoint : null
+    }
+
+    return checkpointInside(anchorNode.childNodes[selection.anchorOffset - 1], true)
+      ?? checkpointInside(anchorNode.childNodes[selection.anchorOffset], false)
+  }
+
+  function outerChecklistWrapper(checkpoint, editor) {
+    let wrapper = checkpoint
+    while (wrapper.parentElement !== editor && wrapper.parentElement?.childNodes.length === 1) wrapper = wrapper.parentElement
+    return wrapper
+  }
+
+  function handleGeneralNoteChecklistInput(noteId, event) {
+    const isEnter = event.key === 'Enter' || event.inputType === 'insertParagraph' || event.inputType === 'insertLineBreak'
+    const isBackspace = event.key === 'Backspace' || event.inputType === 'deleteContentBackward'
+    if (!isEnter && !isBackspace) return
+    const editor = event.currentTarget
+    const selection = window.getSelection()
+    const checkpoint = event.target.closest?.('[data-checkpoint="true"]') ?? checkpointFromCaret(editor, selection)
+    if (!checkpoint || !editor.contains(checkpoint)) return
+    const text = checkpoint.querySelector('span')
+    if (!text) return
+
+    if (isBackspace) {
+      if (!noteCaretIsAtStart(text, selection)) return
+      event.preventDefault()
+      const removableRow = outerChecklistWrapper(checkpoint, editor)
+      const normalLine = document.createElement('div')
+      while (text.firstChild) normalLine.append(text.firstChild)
+      if (normalLine.firstChild?.nodeType === Node.TEXT_NODE) normalLine.firstChild.data = normalLine.firstChild.data.replace(/^\u200b/, '')
+      if (!normalLine.textContent && !normalLine.querySelector('br')) normalLine.append(document.createElement('br'))
+      removableRow.replaceWith(normalLine)
+      placeCaretInNote(normalLine, true)
+      updateGeneralNoteContent(noteId, editor)
+      return
+    }
+
+    event.preventDefault()
+    if (!selection.rangeCount) return
+    const activeRange = selection.getRangeAt(0)
+    if (!activeRange.collapsed) activeRange.deleteContents()
+    const trailingContent = document.createDocumentFragment()
+    if (text === activeRange.startContainer || text.contains(activeRange.startContainer)) {
+      const trailingRange = document.createRange()
+      trailingRange.setStart(activeRange.startContainer, activeRange.startOffset)
+      trailingRange.setEnd(text, text.childNodes.length)
+      trailingContent.append(trailingRange.extractContents())
+    }
+    if (!text.textContent.replace(/\u200b/g, '') && !text.querySelector('br')) text.replaceChildren(document.createTextNode('\u200b'))
+
+    const nextCheckpoint = document.createElement('div')
+    nextCheckpoint.setAttribute('data-checkpoint', 'true')
+    const checkbox = document.createElement('input')
+    checkbox.type = 'checkbox'
+    const nextText = document.createElement('span')
+    nextText.setAttribute('data-checkpoint-text', 'true')
+    nextText.append(document.createTextNode('\u200b'))
+    if (trailingContent.hasChildNodes()) nextText.append(trailingContent)
+    nextCheckpoint.append(checkbox, nextText)
+    outerChecklistWrapper(checkpoint, editor).after(nextCheckpoint)
+    placeCaretAtChecklistStart(nextText)
+    updateGeneralNoteContent(noteId, editor)
+  }
+
+  function pastePlainNoteText(event) {
+    event.preventDefault()
+    document.execCommand('insertText', false, event.clipboardData?.getData('text/plain') ?? '')
   }
 </script>
 
@@ -1333,7 +1724,7 @@
             <table class="dashboard-data-table dashboard-guest-table">
               <thead><tr>
                 <th aria-sort={guestSort.key === 'name' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><div class="bulk-header-cell"><input class="bulk-select-checkbox" use:setIndeterminate={someVisibleGuestsSelected} type="checkbox" checked={allVisibleGuestsSelected} onchange={(event) => selectVisibleGuests(event.currentTarget.checked)} aria-label="Select all visible guests" /><button class="guest-sort-button" class:sorted={guestSort.key === 'name'} type="button" onclick={() => sortGuests('name')}>Name <span aria-hidden="true">{sortArrow(guestSort, 'name')}</span></button></div></th>
-                <th aria-sort={guestSort.key === 'party' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={guestSort.key === 'party'} type="button" onclick={() => sortGuests('party')}>Number of people <span aria-hidden="true">{sortArrow(guestSort, 'party')}</span></button></th>
+                <th aria-sort={guestSort.key === 'party' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={guestSort.key === 'party'} type="button" onclick={() => sortGuests('party')}>Guests <span aria-hidden="true">{sortArrow(guestSort, 'party')}</span></button></th>
                 <th aria-sort={guestSort.key === 'email' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={guestSort.key === 'email'} type="button" onclick={() => sortGuests('email')}>Contact details <span aria-hidden="true">{sortArrow(guestSort, 'email')}</span></button></th>
                 <th aria-sort={guestSort.key === 'meal' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={guestSort.key === 'meal'} type="button" onclick={() => sortGuests('meal')}>Note <span aria-hidden="true">{sortArrow(guestSort, 'meal')}</span></button></th>
                 <th aria-sort={guestSort.key === 'status' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={guestSort.key === 'status'} type="button" onclick={() => sortGuests('status')}>RSVP <span aria-hidden="true">{sortArrow(guestSort, 'status')}</span></button></th>
@@ -1590,9 +1981,9 @@
 
       {:else if active === 'music'}
         <section class="dashboard-view" aria-labelledby="music-heading">
-          <header class="dashboard-page-heading"><div><h1 id="music-heading">Music</h1><p>Keep every important song and playlist link organized by moment.</p></div><button class="dashboard-primary" type="button" onclick={openMusicForm}>+ Add song</button></header>
+          <header class="dashboard-page-heading"><div><h1 id="music-heading">Music</h1><p>Add official Spotify, Apple Music, and YouTube Music players for songs and playlists.</p></div><button class="dashboard-primary" type="button" onclick={openMusicForm}>+ Add music</button></header>
 
-          <div class="table-topbar"><div class="table-topbar-left"><label class="table-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={musicSearch} placeholder="Search music" aria-label="Search songs or links" /><span>{filteredSongs.length}</span></label>{#if visibleSelectedSongIds.length > 0}<div class="table-selected-actions"><span>{visibleSelectedSongIds.length} selected</span><button type="button" class="bulk-delete-button" aria-label="Delete selected songs" title="Delete selected" onclick={() => requestBulkDelete('music')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div><div class="table-topbar-right"><div class="table-filter-chips" role="group" aria-label="Filter music by type"><button class:active={musicFilter === 'all'} type="button" onclick={() => (musicFilter = 'all')}>All <strong>{(data.songs ?? []).length}</strong></button><button class:active={musicFilter === 'entrance'} type="button" onclick={() => (musicFilter = 'entrance')}>Entrance <strong>{(data.songs ?? []).filter((song) => song.type === 'entrance').length}</strong></button><button class:active={musicFilter === 'first-dance'} type="button" onclick={() => (musicFilter = 'first-dance')}>First dance <strong>{(data.songs ?? []).filter((song) => song.type === 'first-dance').length}</strong></button><button class:active={musicFilter === 'party'} type="button" onclick={() => (musicFilter = 'party')}>Party <strong>{(data.songs ?? []).filter((song) => song.type === 'party').length}</strong></button><button class:active={musicFilter === 'reception'} type="button" onclick={() => (musicFilter = 'reception')}>Reception <strong>{(data.songs ?? []).filter((song) => song.type === 'reception').length}</strong></button><button class:active={musicFilter === 'other'} type="button" onclick={() => (musicFilter = 'other')}>Other <strong>{(data.songs ?? []).filter((song) => song.type === 'other').length}</strong></button></div><button class="table-download-button" type="button" onclick={downloadMusicCsv} aria-label="Download music list CSV" title="Download CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></div>
+          <div class="table-topbar"><div class="table-topbar-left"><label class="table-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={musicSearch} placeholder="Search music" aria-label="Search songs or links" /><span>{filteredSongs.length}</span></label>{#if visibleSelectedSongIds.length > 0}<div class="table-selected-actions"><span>{visibleSelectedSongIds.length} selected</span><button type="button" class="bulk-delete-button" aria-label="Delete selected songs" title="Delete selected" onclick={() => requestBulkDelete('music')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div><div class="table-topbar-right"><div class="table-filter-chips" role="group" aria-label="Filter music by type"><button class:active={musicFilter === 'all'} type="button" onclick={() => (musicFilter = 'all')}>All <strong>{(data.songs ?? []).length}</strong></button><button class:active={musicFilter === 'entrance'} type="button" onclick={() => (musicFilter = 'entrance')}>Entrance <strong>{(data.songs ?? []).filter((song) => song.type === 'entrance').length}</strong></button><button class:active={musicFilter === 'first-dance'} type="button" onclick={() => (musicFilter = 'first-dance')}>First dance <strong>{(data.songs ?? []).filter((song) => song.type === 'first-dance').length}</strong></button><button class:active={musicFilter === 'parent-dance'} type="button" onclick={() => (musicFilter = 'parent-dance')}>Parent dance <strong>{(data.songs ?? []).filter((song) => song.type === 'parent-dance').length}</strong></button><button class:active={musicFilter === 'cake-cutting'} type="button" onclick={() => (musicFilter = 'cake-cutting')}>Cake cutting <strong>{(data.songs ?? []).filter((song) => song.type === 'cake-cutting').length}</strong></button><button class:active={musicFilter === 'party'} type="button" onclick={() => (musicFilter = 'party')}>Party <strong>{(data.songs ?? []).filter((song) => song.type === 'party').length}</strong></button><button class:active={musicFilter === 'reception'} type="button" onclick={() => (musicFilter = 'reception')}>Reception <strong>{(data.songs ?? []).filter((song) => song.type === 'reception').length}</strong></button><button class:active={musicFilter === 'other'} type="button" onclick={() => (musicFilter = 'other')}>Other <strong>{(data.songs ?? []).filter((song) => song.type === 'other').length}</strong></button></div><button class="table-download-button" type="button" onclick={downloadMusicCsv} aria-label="Download music list CSV" title="Download CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></div>
 
           <div class="dashboard-table-wrap" role="region" aria-label="Music list table">
             <table class="dashboard-data-table dashboard-music-table">
@@ -1605,14 +1996,18 @@
               <tbody>
                 {#if showMusicForm}
                   <tr class="dashboard-inline-row dashboard-inline-music-row">
-                    <td><input bind:value={musicForm.name} aria-label="Song name" required placeholder="Song name and artist" /></td>
-                    <td><input bind:value={musicForm.link} type="text" aria-label="Song link" placeholder="https://…" /></td>
-                    <td><select bind:value={musicForm.type} aria-label="Song type"><option value="entrance">Entrance</option><option value="first-dance">First dance</option><option value="party">Party</option><option value="reception">Reception</option><option value="other">Other</option></select></td>
-                    <td><div class="inline-row-actions"><button type="button" onclick={addSong}>Save</button><button type="button" onclick={() => (showMusicForm = false)}>Cancel</button></div></td>
+                    <td><input bind:value={musicForm.name} oninput={scheduleMusicMetadataLookup} aria-label="Music title" placeholder={musicMetadataLoading ? 'Finding title…' : 'Title and artist'} /></td>
+                    <td><div class="music-inline-link-field"><input bind:value={musicForm.link} oninput={scheduleMusicMetadataLookup} type="text" inputmode="url" aria-invalid={musicLinkError ? 'true' : undefined} aria-describedby={musicLinkError ? 'music-link-error' : 'music-link-help'} placeholder="Optional music link" />{#if musicMetadataLoading}<small id="music-link-help">Finding title and artist…</small>{:else if detectedMusicLink}<small id="music-link-help" class="music-link-detected">✓ {detectedMusicLink.platformLabel} detected</small>{:else if musicForm.link.trim()}<small id="music-link-help">Saved as an external link without a player.</small>{:else}<small id="music-link-help">Optional · Spotify, Apple Music, or YouTube Music</small>{/if}{#if musicLinkError}<small id="music-link-error" class="music-link-error">{musicLinkError}</small>{/if}</div></td>
+                    <td><select bind:value={musicForm.type} aria-label="Music type"><option value="entrance">Entrance</option><option value="first-dance">First dance</option><option value="parent-dance">Parent dance</option><option value="cake-cutting">Cake cutting</option><option value="party">Party</option><option value="reception">Reception</option><option value="other">Other</option></select></td>
+                    <td><div class="inline-row-actions"><button type="button" disabled={musicSaving} onclick={addSong}>{musicSaving ? 'Saving…' : 'Save'}</button><button type="button" onclick={() => (showMusicForm = false)}>Cancel</button></div></td>
                   </tr>
                 {/if}
                 {#each sortedSongs as song (song.id)}
-                  <tr><td><input class="bulk-select-checkbox" type="checkbox" checked={selectedSongIds.includes(song.id)} onchange={() => toggleSongSelection(song.id)} aria-label={`Select ${song.name}`} /><span class="music-song-name"><i aria-hidden="true">♪</i><strong>{song.name}</strong></span></td><td>{#if song.link}<a class="music-link" href={songLinkHref(song.link)} target="_blank" rel="noreferrer">Open song <span aria-hidden="true">↗</span></a>{:else}<span class="music-no-link">No link</span>{/if}</td><td><span class={`music-type music-type--${song.type}`}>{songTypeLabel(song.type)}</span></td><td><button class="dashboard-row-remove" type="button" onclick={() => removeSong(song.id)} aria-label={`Remove ${song.name}`}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></td></tr>
+                  {@const music = musicDetails(song.link)}
+                  <tr class:music-row-open={openMusicPlayerId === song.id}><td><input class="bulk-select-checkbox" type="checkbox" checked={selectedSongIds.includes(song.id)} onchange={() => toggleSongSelection(song.id)} aria-label={`Select ${song.name}`} /><span class="music-song-name"><i aria-hidden="true">♪</i><strong>{song.name}</strong></span></td><td>{#if music}<div class={`music-table-player-bar music-table-player-bar--${music.platform}`}><span><i aria-hidden="true"></i>{music.platformLabel} {music.kindLabel}</span><button type="button" aria-expanded={openMusicPlayerId === song.id} aria-controls={`music-player-${song.id}`} onclick={() => (openMusicPlayerId = openMusicPlayerId === song.id ? '' : song.id)}>{openMusicPlayerId === song.id ? 'Close' : 'Open player'}</button></div>{:else if song.link}<a class="music-link" href={songLinkHref(song.link)} target="_blank" rel="noreferrer">Open link <span aria-hidden="true">↗</span></a>{:else}<span class="music-no-link">No link</span>{/if}</td><td><span class={`music-type music-type--${song.type}`}>{songTypeLabel(song.type)}</span></td><td><button class="dashboard-row-remove" type="button" onclick={() => removeSong(song.id)} aria-label={`Remove ${song.name}`}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></td></tr>
+                  {#if music && openMusicPlayerId === song.id}
+                    <tr class="music-expanded-player-row"><td colspan="4"><div id={`music-player-${song.id}`} class="music-expanded-player"><iframe class={`music-embed music-embed--${music.platform}`} src={music.embedUrl} title={`${song.name} on ${music.platformLabel}`} height={music.height} loading="lazy" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" allowfullscreen></iframe><div><p>Playback availability depends on the visitor’s region, login, and subscription.</p><a href={musicFallbackUrl(song.link)} target="_blank" rel="noreferrer">Open in Music App <span aria-hidden="true">↗</span></a></div></div></td></tr>
+                  {/if}
                 {:else}
                   {#if !showMusicForm}<tr class="music-empty-row"><td colspan="4"><p>No songs added yet. Add your first song to start planning the soundtrack.</p></td></tr>{/if}
                 {/each}
@@ -1720,65 +2115,116 @@
           </header>
 
           <div class="notes-calendar-layout">
-            <section class="notes-calendar-panel" aria-labelledby="calendar-panel-heading">
+            <div class:collapsed={notesSectionsCollapsed.calendar} class="notes-date-panel">
+              <button class="notes-collapse-button notes-date-panel__collapse" type="button" aria-expanded={!notesSectionsCollapsed.calendar} aria-controls="notes-calendar-content selected-day-content" aria-label={notesSectionsCollapsed.calendar ? 'Expand calendar and selected day' : 'Minimize calendar and selected day'} onclick={toggleCalendarAndDaySections}>{notesSectionsCollapsed.calendar ? '+' : '−'}</button>
+              <section class="notes-calendar-panel" aria-labelledby="calendar-panel-heading">
               <header class="notes-section-header">
                 <h2 id="calendar-panel-heading">Calendar</h2>
-                <button class="notes-collapse-button" type="button" aria-expanded={!notesSectionsCollapsed.calendar} aria-label={notesSectionsCollapsed.calendar ? 'Expand calendar' : 'Minimize calendar'} onclick={() => toggleNotesSection('calendar')}>{notesSectionsCollapsed.calendar ? '+' : '−'}</button>
               </header>
               {#if !notesSectionsCollapsed.calendar}
-                <div class="notes-calendar-toolbar">
-                  <button class="notes-calendar-nav" type="button" aria-label="Previous month" onclick={() => changeCalendarMonth(-1)}>‹</button>
-                  <h3>{calendarMonthLabel}</h3>
-                  <button class="notes-calendar-nav" type="button" aria-label="Next month" onclick={() => changeCalendarMonth(1)}>›</button>
-                  <button class="notes-today-button" type="button" onclick={goToToday}>Today</button>
-                </div>
-                <div class="notes-calendar-grid" role="grid" aria-label={calendarMonthLabel}>
-                  {#each ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as weekday}
-                    <span class="notes-calendar-weekday" role="columnheader">{weekday}</span>
-                  {/each}
-                  {#each calendarDays as day (day.key)}
-                    {@const eventCount = (data.notesCalendar?.events ?? []).filter((event) => event.date === day.key).length}
-                    <button class:outside-month={!day.inMonth} class:selected-day={selectedDayKey === day.key} class:has-events={eventCount > 0} class="notes-calendar-day" type="button" role="gridcell" aria-pressed={selectedDayKey === day.key} aria-label={`${day.date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}${eventCount ? `, ${eventCount} events` : ''}`} onclick={() => { selectedDayKey = day.key; calendarEventFormOpen = false }}>
-                      <span>{day.date.getDate()}</span>
-                      {#if eventCount > 0}<i aria-hidden="true"></i>{/if}
-                    </button>
-                  {/each}
+                <div id="notes-calendar-content">
+                  <div class="notes-calendar-toolbar">
+                    <button class="notes-calendar-nav" type="button" aria-label="Previous month" onclick={() => changeCalendarMonth(-1)}>‹</button>
+                    <h3>{calendarMonthLabel}</h3>
+                    <button class="notes-calendar-nav" type="button" aria-label="Next month" onclick={() => changeCalendarMonth(1)}>›</button>
+                    <button class="notes-today-button" type="button" onclick={goToToday}>Today</button>
+                  </div>
+                  <div class="notes-calendar-grid" role="grid" aria-label={calendarMonthLabel}>
+                    {#each ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as weekday}
+                      <span class="notes-calendar-weekday" role="columnheader">{weekday}</span>
+                    {/each}
+                    {#each calendarDays as day (day.key)}
+                      {@const eventCount = (data.notesCalendar?.events ?? []).filter((event) => event.date === day.key).length}
+                      <button class:outside-month={!day.inMonth} class:selected-day={selectedDayKey === day.key} class:has-events={eventCount > 0} class="notes-calendar-day" type="button" role="gridcell" aria-selected={selectedDayKey === day.key} aria-label={`${day.date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}${eventCount ? `, ${eventCount} events` : ''}`} onclick={() => { selectedDayKey = day.key; calendarEventFormOpen = false }}>
+                        <span>{day.date.getDate()}</span>
+                        {#if eventCount > 0}<i aria-hidden="true"></i>{/if}
+                      </button>
+                    {/each}
+                  </div>
                 </div>
               {/if}
-            </section>
+              </section>
 
-            <section class="notes-content-panel" aria-labelledby="day-notes-heading">
+              {#if !notesSectionsCollapsed.day}<section class="notes-content-panel" aria-labelledby="day-notes-heading">
               <header class="notes-section-header">
                 <div><p class="dashboard-eyebrow">Selected day</p><h2 id="day-notes-heading">{new Date(`${selectedDayKey}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</h2></div>
-                <button class="notes-collapse-button" type="button" aria-expanded={!notesSectionsCollapsed.day} aria-label={notesSectionsCollapsed.day ? 'Expand selected-day notes' : 'Minimize selected-day notes'} onclick={() => toggleNotesSection('day')}>{notesSectionsCollapsed.day ? '+' : '−'}</button>
               </header>
               {#if !notesSectionsCollapsed.day}
-                <div class="notes-day-events">
-                  <div class="notes-subsection-heading"><h3>Events</h3><button class="dashboard-secondary" type="button" onclick={() => (calendarEventFormOpen = !calendarEventFormOpen)}>{calendarEventFormOpen ? 'Cancel' : '+ Add event'}</button></div>
-                  {#if calendarEventFormOpen}
-                    <form class="calendar-event-form" onsubmit={addCalendarEvent}>
-                      <label><span>Event</span><input bind:value={calendarEventForm.title} required maxlength="120" placeholder="Event title" /></label>
-                      <label><span>Time</span><input bind:value={calendarEventForm.time} type="time" aria-label="Event time (optional)" /></label>
-                      <button class="dashboard-primary" type="submit">Add</button>
-                    </form>
-                  {/if}
-                  {#if selectedDayEvents.length}
-                    <ul class="calendar-event-list">{#each selectedDayEvents as event (event.id)}<li><time>{event.time || 'All day'}</time><span>{event.title}</span><button type="button" aria-label={`Remove ${event.title}`} onclick={() => removeCalendarEvent(event.id)}>×</button></li>{/each}</ul>
-                  {:else if !calendarEventFormOpen}
-                    <p class="notes-empty-hint">No events for this day.</p>
-                  {/if}
+                <div id="selected-day-content">
+                  <div class="notes-day-events">
+                    <div class="notes-subsection-heading"><h3>Events</h3><button class="dashboard-secondary" type="button" onclick={() => (calendarEventFormOpen = !calendarEventFormOpen)}>{calendarEventFormOpen ? 'Cancel' : '+ Add event'}</button></div>
+                    {#if calendarEventFormOpen}
+                      <form class="calendar-event-form" onsubmit={addCalendarEvent}>
+                        <label><span>Event</span><input bind:value={calendarEventForm.title} required maxlength="120" placeholder="Event title" /></label>
+                        <label><span>Time</span><input bind:value={calendarEventForm.time} type="time" aria-label="Event time (optional)" /></label>
+                        <button class="dashboard-primary" type="submit">Add</button>
+                      </form>
+                    {/if}
+                    {#if selectedDayEvents.length}
+                      <ul class="calendar-event-list">{#each selectedDayEvents as event (event.id)}<li><time>{event.time || 'All day'}</time><span>{event.title}</span><button type="button" aria-label={`Remove ${event.title}`} onclick={() => removeCalendarEvent(event.id)}>×</button></li>{/each}</ul>
+                    {:else if !calendarEventFormOpen}
+                      <p class="notes-empty-hint">No events for this day.</p>
+                    {/if}
+                  </div>
+                  <label class="notes-textarea-label" for="selected-day-notes"><span>Notes for this day</span><textarea id="selected-day-notes" value={data.notesCalendar?.dailyNotes?.[selectedDayKey] ?? ''} oninput={(event) => updateSelectedDayNotes(event.currentTarget.value)} placeholder="Add notes for this date…"></textarea></label>
                 </div>
-                <label class="notes-textarea-label" for="selected-day-notes"><span>Notes for this day</span><textarea id="selected-day-notes" value={data.notesCalendar?.dailyNotes?.[selectedDayKey] ?? ''} oninput={(event) => updateSelectedDayNotes(event.currentTarget.value)} placeholder="Add notes for this date…"></textarea></label>
               {/if}
-            </section>
+              </section>{/if}
+            </div>
 
             <section class="notes-content-panel notes-fixed-panel" aria-labelledby="fixed-notes-heading">
               <header class="notes-section-header">
-                <div><p class="dashboard-eyebrow">Always available</p><h2 id="fixed-notes-heading">Fixed notes</h2></div>
-                <button class="notes-collapse-button" type="button" aria-expanded={!notesSectionsCollapsed.fixed} aria-label={notesSectionsCollapsed.fixed ? 'Expand fixed notes' : 'Minimize fixed notes'} onclick={() => toggleNotesSection('fixed')}>{notesSectionsCollapsed.fixed ? '+' : '−'}</button>
+                <div><h2 id="fixed-notes-heading">General notes</h2></div>
+                <div class="general-notes-header-actions">
+                  <button class="dashboard-secondary general-note-add" type="button" onclick={addGeneralNote}>+ Add note</button>
+                  <button class="notes-collapse-button" type="button" aria-expanded={!notesSectionsCollapsed.fixed} aria-label={notesSectionsCollapsed.fixed ? 'Expand general notes' : 'Minimize general notes'} onclick={() => toggleNotesSection('fixed')}>{notesSectionsCollapsed.fixed ? '+' : '−'}</button>
+                </div>
               </header>
               {#if !notesSectionsCollapsed.fixed}
-                <label class="notes-textarea-label" for="fixed-notes"><span>Notes that stay here</span><textarea id="fixed-notes" value={data.notesCalendar?.fixedNotes ?? ''} oninput={(event) => updateFixedNotes(event.currentTarget.value)} placeholder="Keep important notes here…"></textarea></label>
+                <div class="general-notes-list" role="list">
+                  {#each generalNotesData() as note (note.id)}
+                    <article role="listitem" class:editing={activeGeneralNoteId === note.id} class:full-width={note.fullWidth || generalNoteAutoFullWidth(note.id)} class:dragging={draggedGeneralNoteId === note.id} class:drag-over={dragOverGeneralNoteId === note.id && draggedGeneralNoteId !== note.id} class={`general-note-card general-note-card--${note.color || 'yellow'}`} onfocusin={(event) => { if (!event.target.matches?.('input[type="checkbox"], .general-note-drag-handle, .general-note-width-toggle, .general-note-background-picker button')) activeGeneralNoteId = note.id }} ondragover={(event) => { if (draggedGeneralNoteId && draggedGeneralNoteId !== note.id) { event.preventDefault(); dragOverGeneralNoteId = note.id } }} ondrop={(event) => dropGeneralNote(event, note.id)}>
+                      <div class="general-note-topline">
+                        {#if activeGeneralNoteId === note.id}
+                          <input id={`general-note-title-${note.id}`} class="general-note-title" value={note.title} oninput={(event) => updateGeneralNote(note.id, { title: event.currentTarget.value })} maxlength="100" aria-label="Note title" placeholder="Note title" />
+                        {:else}
+                          <h3 class="general-note-title-display">{note.title || 'Untitled note'}</h3>
+                        {/if}
+                        <button class="general-note-drag-handle" type="button" draggable="true" aria-label={`Drag ${note.title || 'note'} to reorder`} title="Drag to reorder" ondragstart={(event) => startGeneralNoteDrag(event, note.id)} ondragend={finishGeneralNoteDrag}><svg viewBox="0 0 16 20" aria-hidden="true"><circle cx="5" cy="4" r="1"></circle><circle cx="11" cy="4" r="1"></circle><circle cx="5" cy="10" r="1"></circle><circle cx="11" cy="10" r="1"></circle><circle cx="5" cy="16" r="1"></circle><circle cx="11" cy="16" r="1"></circle></svg></button>
+                      </div>
+                      <div class="general-note-card-actions">
+                        <div class="general-note-background-picker" role="group" aria-label="Note background color">
+                          {#each [{ value: 'yellow', label: 'Yellow' }, { value: 'rose', label: 'Rose' }, { value: 'blue', label: 'Blue' }, { value: 'green', label: 'Green' }, { value: 'white', label: 'White' }] as color}
+                            <button class:active={(note.color || 'yellow') === color.value} class={`general-note-background-swatch general-note-background-swatch--${color.value}`} type="button" aria-label={`${color.label} background`} aria-pressed={(note.color || 'yellow') === color.value} onclick={() => updateGeneralNote(note.id, { color: color.value })}></button>
+                          {/each}
+                        </div>
+                        <button class:active={note.fullWidth} class="general-note-width-toggle" type="button" aria-label={note.fullWidth ? `Use half width for ${note.title || 'note'}` : `Make ${note.title || 'note'} full width`} aria-pressed={Boolean(note.fullWidth)} title={note.fullWidth ? 'Use half width' : 'Make full width'} onclick={() => updateGeneralNote(note.id, { fullWidth: !note.fullWidth })}><svg viewBox="0 0 20 20" aria-hidden="true">{#if note.fullWidth}<path d="m7 6-3 4 3 4M13 6l3 4-3 4M4 10h12"></path>{:else}<path d="M8 6 4 10l4 4M12 6l4 4-4 4M4 10h12"></path>{/if}</svg></button>
+                        <button class="general-note-remove" type="button" onclick={() => removeGeneralNote(note.id)} aria-label={`Delete ${note.title || 'note'}`}>×</button>
+                      </div>
+
+                      {#if activeGeneralNoteId === note.id}<div class="general-note-toolbar" role="group" aria-label="Text formatting">
+                        <button class:active={noteFormatActive(note.id, 'bold')} type="button" aria-pressed={noteFormatActive(note.id, 'bold')} onmousedown={(event) => event.preventDefault()} onclick={() => applyGeneralNoteFormat(note.id, 'bold')} aria-label="Bold"><strong>B</strong></button>
+                        <button class:active={noteFormatActive(note.id, 'italic')} type="button" aria-pressed={noteFormatActive(note.id, 'italic')} onmousedown={(event) => event.preventDefault()} onclick={() => applyGeneralNoteFormat(note.id, 'italic')} aria-label="Italic"><em>I</em></button>
+                        <button class:active={noteFormatActive(note.id, 'underline')} type="button" aria-pressed={noteFormatActive(note.id, 'underline')} onmousedown={(event) => event.preventDefault()} onclick={() => applyGeneralNoteFormat(note.id, 'underline')} aria-label="Underline"><u>U</u></button>
+                        <span aria-hidden="true"></span>
+                        <button class:active={noteFormatActive(note.id, 'fontSize', '2')} class="general-note-font-size general-note-font-size--small" type="button" aria-pressed={noteFormatActive(note.id, 'fontSize', '2')} onmousedown={(event) => event.preventDefault()} onclick={() => applyGeneralNoteFormat(note.id, 'fontSize', '2')} aria-label="Small text">A</button>
+                        <button class:active={noteFormatActive(note.id, 'fontSize', '3')} class="general-note-font-size" type="button" aria-pressed={noteFormatActive(note.id, 'fontSize', '3')} onmousedown={(event) => event.preventDefault()} onclick={() => applyGeneralNoteFormat(note.id, 'fontSize', '3')} aria-label="Normal text">A</button>
+                        <button class:active={noteFormatActive(note.id, 'fontSize', '5')} class="general-note-font-size general-note-font-size--large" type="button" aria-pressed={noteFormatActive(note.id, 'fontSize', '5')} onmousedown={(event) => event.preventDefault()} onclick={() => applyGeneralNoteFormat(note.id, 'fontSize', '5')} aria-label="Large text">A</button>
+                        <span aria-hidden="true"></span>
+                        <button class:active={noteColorActive(note.id, '#302f2b', 'rgb(48,47,43)')} class="general-note-text-color general-note-text-color--ink" type="button" aria-pressed={noteColorActive(note.id, '#302f2b', 'rgb(48,47,43)')} onmousedown={(event) => event.preventDefault()} onclick={() => applyGeneralNoteFormat(note.id, 'foreColor', '#302f2b')} aria-label="Dark text"></button>
+                        <button class:active={noteColorActive(note.id, '#9b3f47', 'rgb(155,63,71)')} class="general-note-text-color general-note-text-color--red" type="button" aria-pressed={noteColorActive(note.id, '#9b3f47', 'rgb(155,63,71)')} onmousedown={(event) => event.preventDefault()} onclick={() => applyGeneralNoteFormat(note.id, 'foreColor', '#9b3f47')} aria-label="Red text"></button>
+                        <button class:active={noteColorActive(note.id, '#345f83', 'rgb(52,95,131)')} class="general-note-text-color general-note-text-color--blue" type="button" aria-pressed={noteColorActive(note.id, '#345f83', 'rgb(52,95,131)')} onmousedown={(event) => event.preventDefault()} onclick={() => applyGeneralNoteFormat(note.id, 'foreColor', '#345f83')} aria-label="Blue text"></button>
+                        <button class:active={noteColorActive(note.id, '#37704a', 'rgb(55,112,74)')} class="general-note-text-color general-note-text-color--green" type="button" aria-pressed={noteColorActive(note.id, '#37704a', 'rgb(55,112,74)')} onmousedown={(event) => event.preventDefault()} onclick={() => applyGeneralNoteFormat(note.id, 'foreColor', '#37704a')} aria-label="Green text"></button>
+                        <span aria-hidden="true"></span>
+                        <button class="general-note-checklist-button" type="button" onmousedown={(event) => event.preventDefault()} onclick={() => insertGeneralNoteCheckpoint(note.id)} aria-label="Insert checklist item" title="Insert checklist item"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="7" r="2.5"></circle><path d="m4.8 7 1 1 1.7-2M11 7h9M4 14h4M11 14h9M4 19h4M11 19h9"></path></svg></button>
+                      </div>{/if}
+
+                      <div id={`general-note-editor-${note.id}`} class="general-note-editor" contenteditable="true" role="textbox" tabindex="0" aria-multiline="true" aria-label={`Contents of ${note.title || 'note'}`} data-placeholder="Write a note…" use:richTextEditor={note.content} oninput={(event) => { updateGeneralNoteContent(note.id, event.currentTarget); refreshGeneralNoteFormatting(note.id) }} onclick={(event) => { handleGeneralNoteCheckboxClick(note.id, event); refreshGeneralNoteFormatting(note.id) }} onkeyup={() => refreshGeneralNoteFormatting(note.id)} onmouseup={() => refreshGeneralNoteFormatting(note.id)} onfocus={() => refreshGeneralNoteFormatting(note.id)} onkeydown={(event) => handleGeneralNoteChecklistInput(note.id, event)} onbeforeinput={(event) => handleGeneralNoteChecklistInput(note.id, event)} onpaste={pastePlainNoteText}></div>
+                    </article>
+                  {:else}
+                    <button class="general-notes-empty" type="button" onclick={addGeneralNote}><span>+</span>Add your first note</button>
+                  {/each}
+                </div>
               {/if}
             </section>
           </div>
