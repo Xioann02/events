@@ -37,7 +37,8 @@ export function createDashboardData(site) {
       { id: 'table-3', name: 'Table 3', capacity: 6 },
     ],
     floorPlan: { shapes: [], tableShape: 'round' },
-    notesBoard: { items: [] },
+    notesCalendar: { events: [], dailyNotes: {}, fixedNotes: '' },
+    songs: [],
     vendors: [createSampleVendor()],
     vendorExampleAdded: true,
     messages: [
@@ -126,6 +127,16 @@ export function createVendor(values) {
     deposit: String(values.deposit ?? '').trim(),
     status: values.status || 'researching',
     note: values.note?.trim() ?? '',
+  }
+}
+
+export function createSong(values) {
+  const allowedTypes = ['entrance', 'first-dance', 'party', 'reception', 'other']
+  return {
+    id: id('song'),
+    name: values.name.trim(),
+    link: values.link?.trim() ?? '',
+    type: allowedTypes.includes(values.type) ? values.type : 'other',
   }
 }
 

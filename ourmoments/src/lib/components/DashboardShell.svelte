@@ -1,7 +1,7 @@
 <script>
   import { tick } from 'svelte'
   import { formatEventDate, getTemplate } from '../catalog.js'
-  import { createGift, createGuest, createTable, createVendor, dashboardSummary } from '../dashboard-data.js'
+  import { createGift, createGuest, createSong, createTable, createVendor, dashboardSummary } from '../dashboard-data.js'
   import couplePhoto from '../../assets/modern-couple.jpg'
   import tablePhoto from '../../assets/reception-table.jpg'
   import stillLifePhoto from '../../assets/editorial-still-life.jpg'
@@ -31,12 +31,21 @@
   let active = $state('overview')
   let mobileNavOpen = $state(false)
   let guestSearch = $state('')
+  let giftSearch = $state('')
+  let musicSearch = $state('')
+  let messageSearch = $state('')
+  let vendorSearch = $state('')
   let guestSort = $state({ key: 'name', direction: 'asc' })
+  let giftSort = $state({ key: 'guest', direction: 'asc' })
+  let musicSort = $state({ key: 'name', direction: 'asc' })
+  let messageSort = $state({ key: 'sentAt', direction: 'desc' })
+  let vendorSort = $state({ key: 'name', direction: 'asc' })
   let guestToDelete = $state(null)
   let vendorToDelete = $state(null)
   let bulkDeleteRequest = $state(null)
   let selectedGuestIds = $state([])
   let selectedGiftIds = $state([])
+  let selectedSongIds = $state([])
   let selectedMessageIds = $state([])
   let selectedVendorIds = $state([])
   let openGuestMenuId = $state('')
@@ -44,9 +53,18 @@
   let editingGuestField = $state('')
   let guestEditDirty = $state(false)
   let rsvpFilter = $state('all')
+  let giftFilter = $state('all')
+  let musicFilter = $state('all')
+  let messageFilter = $state('all')
+  let vendorFilter = $state('all')
   let showGuestForm = $state(false)
   let showTableForm = $state(false)
+  let openSeatPicker = $state(null)
+  let seatCapacityWarning = $state(null)
+  let seatCapacityWarningTimer
+  let seatGuestSearch = $state('')
   let showGiftForm = $state(false)
+  let showMusicForm = $state(false)
   let showVendorForm = $state(false)
   let draggedGuestId = $state('')
   let seatingView = $state('tables')
@@ -59,31 +77,59 @@
   let openFloorTableId = $state('')
   let floorTableMoved = false
   let suppressFloorTableClick = false
-  let notesGesture = $state(null)
-  let activeNoteId = $state('')
-  let noteSelection = null
+  let calendarCursor = $state(new Date())
+  let selectedDayKey = $state(formatCalendarDate(new Date()))
+  let notesSectionsCollapsed = $state({ calendar: false, day: false, fixed: false })
+  let calendarEventFormOpen = $state(false)
+  let calendarEventForm = $state({ title: '', time: '' })
   let copied = $state(false)
   let guestForm = $state({ name: '', email: '', phone: '', adults: 1, children: 0, status: 'pending', note: '', meal: '' })
   let guestEditForm = $state({ name: '', email: '', phone: '', adults: 1, children: 0, status: 'pending', note: '', meal: '' })
   let tableForm = $state({ capacity: 8 })
   let giftForm = $state({ guestId: '', guest: '', type: 'money', amount: '', currency: 'EUR', gift: '', note: '' })
+  let musicForm = $state({ name: '', link: '', type: 'other' })
   let vendorForm = $state({ name: '', category: 'Venue', contact: '', email: '', phone: '', website: '', cost: '', deposit: '', status: 'researching', note: '' })
 
   let summary = $derived(dashboardSummary(data))
   let template = $derived(getTemplate(site.templateId))
   let selectedFloorShape = $derived((data.floorPlan?.shapes ?? []).find((shape) => shape.id === selectedFloorShapeId))
   let floorTableShape = $derived(data.floorPlan?.tableShape === 'rectangle' ? 'rectangle' : 'round')
+  let calendarDays = $derived.by(() => {
+    const monthStart = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth(), 1)
+    const mondayOffset = (monthStart.getDay() + 6) % 7
+    return Array.from({ length: 42 }, (_, index) => {
+      const date = new Date(monthStart.getFullYear(), monthStart.getMonth(), index - mondayOffset + 1)
+      return {
+        date,
+        key: formatCalendarDate(date),
+        inMonth: date.getMonth() === calendarCursor.getMonth(),
+      }
+    })
+  })
+  let selectedDayEvents = $derived((data.notesCalendar?.events ?? []).filter((event) => event.date === selectedDayKey).sort((a, b) => (a.time || '').localeCompare(b.time || '')))
+  let calendarMonthLabel = $derived(calendarCursor.toLocaleDateString(undefined, { month: 'long', year: 'numeric' }))
   let visibleSelectedGuestIds = $derived(sortedGuests.filter((guest) => selectedGuestIds.includes(guest.id)).map((guest) => guest.id))
   let allVisibleGuestsSelected = $derived(sortedGuests.length > 0 && visibleSelectedGuestIds.length === sortedGuests.length)
   let someVisibleGuestsSelected = $derived(visibleSelectedGuestIds.length > 0 && !allVisibleGuestsSelected)
-  let visibleSelectedGiftIds = $derived(data.gifts.filter((gift) => selectedGiftIds.includes(gift.id)).map((gift) => gift.id))
-  let allGiftsSelected = $derived(data.gifts.length > 0 && visibleSelectedGiftIds.length === data.gifts.length)
+  let filteredGifts = $derived(data.gifts.filter((gift) => `${gift.guest} ${giftLabel(gift)} ${gift.note}`.toLowerCase().includes(giftSearch.toLowerCase()) && (giftFilter === 'all' || (giftFilter === 'thanked' ? gift.thanked : !gift.thanked))))
+  let filteredSongs = $derived((data.songs ?? []).filter((song) => `${song.name} ${song.link} ${songTypeLabel(song.type)}`.toLowerCase().includes(musicSearch.toLowerCase()) && (musicFilter === 'all' || song.type === musicFilter)))
+  let filteredMessages = $derived((data.messages ?? []).filter((message) => `${message.name} ${message.email} ${message.phone} ${message.message}`.toLowerCase().includes(messageSearch.toLowerCase()) && (messageFilter === 'all' || (messageFilter === 'read' ? message.read : !message.read))))
+  let filteredVendors = $derived((data.vendors ?? []).filter((vendor) => {
+    const matchesSearch = `${vendor.name} ${vendor.category} ${vendor.contact} ${vendor.email} ${vendor.phone} ${vendor.note}`.toLowerCase().includes(vendorSearch.toLowerCase())
+    const booked = ['booked', 'paid'].includes(vendor.status)
+    return matchesSearch && (vendorFilter === 'all' || (vendorFilter === 'booked' ? booked : !booked))
+  }))
+  let visibleSelectedGiftIds = $derived(filteredGifts.filter((gift) => selectedGiftIds.includes(gift.id)).map((gift) => gift.id))
+  let allGiftsSelected = $derived(filteredGifts.length > 0 && visibleSelectedGiftIds.length === filteredGifts.length)
   let someGiftsSelected = $derived(visibleSelectedGiftIds.length > 0 && !allGiftsSelected)
-  let visibleSelectedMessageIds = $derived((data.messages ?? []).filter((message) => selectedMessageIds.includes(message.id)).map((message) => message.id))
-  let allMessagesSelected = $derived((data.messages ?? []).length > 0 && visibleSelectedMessageIds.length === (data.messages ?? []).length)
+  let visibleSelectedSongIds = $derived(filteredSongs.filter((song) => selectedSongIds.includes(song.id)).map((song) => song.id))
+  let allSongsSelected = $derived(filteredSongs.length > 0 && visibleSelectedSongIds.length === filteredSongs.length)
+  let someSongsSelected = $derived(visibleSelectedSongIds.length > 0 && !allSongsSelected)
+  let visibleSelectedMessageIds = $derived(filteredMessages.filter((message) => selectedMessageIds.includes(message.id)).map((message) => message.id))
+  let allMessagesSelected = $derived(filteredMessages.length > 0 && visibleSelectedMessageIds.length === filteredMessages.length)
   let someMessagesSelected = $derived(visibleSelectedMessageIds.length > 0 && !allMessagesSelected)
-  let visibleSelectedVendorIds = $derived((data.vendors ?? []).filter((vendor) => selectedVendorIds.includes(vendor.id)).map((vendor) => vendor.id))
-  let allVendorsSelected = $derived((data.vendors ?? []).length > 0 && visibleSelectedVendorIds.length === (data.vendors ?? []).length)
+  let visibleSelectedVendorIds = $derived(filteredVendors.filter((vendor) => selectedVendorIds.includes(vendor.id)).map((vendor) => vendor.id))
+  let allVendorsSelected = $derived(filteredVendors.length > 0 && visibleSelectedVendorIds.length === filteredVendors.length)
   let someVendorsSelected = $derived(visibleSelectedVendorIds.length > 0 && !allVendorsSelected)
   let filteredGuests = $derived(
     data.guests.filter((guest) => {
@@ -102,12 +148,50 @@
       return guestSort.direction === 'asc' ? comparison : -comparison
     }),
   )
+  let sortedGifts = $derived(sortTableRows(filteredGifts, giftSort))
+  let sortedSongs = $derived(sortTableRows(filteredSongs, musicSort))
+  let sortedMessages = $derived(sortTableRows(filteredMessages, messageSort))
+  let sortedVendors = $derived(sortTableRows(filteredVendors, vendorSort))
   let unassignedGuests = $derived(data.guests.filter((guest) => guest.status === 'attending' && !guest.tableId))
 
   function navigate(section) {
     active = section
     mobileNavOpen = false
     window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function tableSortValue(item, key) {
+    if (key === 'giftValue') return giftLabel(item)
+    if (key === 'contact') return `${item.contact ?? ''} ${item.email ?? ''} ${item.phone ?? ''}`
+    if (key === 'cost') return Number(item.cost) || 0
+    if (key === 'sentAt') return new Date(item.sentAt).getTime() || 0
+    return item[key] ?? ''
+  }
+
+  function sortTableRows(rows, sort) {
+    return [...rows].sort((first, second) => {
+      const firstValue = tableSortValue(first, sort.key)
+      const secondValue = tableSortValue(second, sort.key)
+      const comparison = typeof firstValue === 'number' && typeof secondValue === 'number'
+        ? firstValue - secondValue
+        : String(firstValue).localeCompare(String(secondValue), undefined, { sensitivity: 'base', numeric: true })
+      return sort.direction === 'asc' ? comparison : -comparison
+    })
+  }
+
+  function toggleTableSort(table, key) {
+    const current = table === 'guests' ? guestSort : table === 'gifts' ? giftSort : table === 'music' ? musicSort : table === 'messages' ? messageSort : vendorSort
+    const next = { key, direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc' }
+    if (table === 'guests') guestSort = next
+    if (table === 'gifts') giftSort = next
+    if (table === 'music') musicSort = next
+    if (table === 'messages') messageSort = next
+    if (table === 'vendors') vendorSort = next
+  }
+
+  function sortArrow(sort, key) {
+    if (sort.key !== key) return '↕'
+    return sort.direction === 'asc' ? '↑' : '↓'
   }
 
   function addGuest(event) {
@@ -182,8 +266,20 @@
 
   function selectAllGifts(checked) {
     selectedGiftIds = checked
-      ? [...new Set([...selectedGiftIds, ...data.gifts.map((gift) => gift.id)])]
-      : selectedGiftIds.filter((id) => !data.gifts.some((gift) => gift.id === id))
+      ? [...new Set([...selectedGiftIds, ...filteredGifts.map((gift) => gift.id)])]
+      : selectedGiftIds.filter((id) => !filteredGifts.some((gift) => gift.id === id))
+  }
+
+  function toggleSongSelection(songId) {
+    selectedSongIds = selectedSongIds.includes(songId)
+      ? selectedSongIds.filter((id) => id !== songId)
+      : [...selectedSongIds, songId]
+  }
+
+  function selectAllSongs(checked) {
+    selectedSongIds = checked
+      ? [...new Set([...selectedSongIds, ...filteredSongs.map((song) => song.id)])]
+      : selectedSongIds.filter((id) => !filteredSongs.some((song) => song.id === id))
   }
 
   function toggleMessageSelection(messageId) {
@@ -193,10 +289,9 @@
   }
 
   function selectAllMessages(checked) {
-    const messages = data.messages ?? []
     selectedMessageIds = checked
-      ? [...new Set([...selectedMessageIds, ...messages.map((message) => message.id)])]
-      : selectedMessageIds.filter((id) => !messages.some((message) => message.id === id))
+      ? [...new Set([...selectedMessageIds, ...filteredMessages.map((message) => message.id)])]
+      : selectedMessageIds.filter((id) => !filteredMessages.some((message) => message.id === id))
   }
 
   function toggleVendorSelection(vendorId) {
@@ -206,20 +301,19 @@
   }
 
   function selectAllVendors(checked) {
-    const vendors = data.vendors ?? []
     selectedVendorIds = checked
-      ? [...new Set([...selectedVendorIds, ...vendors.map((vendor) => vendor.id)])]
-      : selectedVendorIds.filter((id) => !vendors.some((vendor) => vendor.id === id))
+      ? [...new Set([...selectedVendorIds, ...filteredVendors.map((vendor) => vendor.id)])]
+      : selectedVendorIds.filter((id) => !filteredVendors.some((vendor) => vendor.id === id))
   }
 
   function requestBulkDelete(type) {
-    const ids = ({ guests: visibleSelectedGuestIds, gifts: visibleSelectedGiftIds, messages: visibleSelectedMessageIds, vendors: visibleSelectedVendorIds })[type] ?? []
+    const ids = ({ guests: visibleSelectedGuestIds, gifts: visibleSelectedGiftIds, music: visibleSelectedSongIds, messages: visibleSelectedMessageIds, vendors: visibleSelectedVendorIds })[type] ?? []
     if (!ids.length) return
     bulkDeleteRequest = { type, ids }
   }
 
   function bulkDeleteTitle(request) {
-    const labels = { guests: 'guests', gifts: 'gifts', messages: 'messages', vendors: 'vendors' }
+    const labels = { guests: 'guests', gifts: 'gifts', music: 'songs', messages: 'messages', vendors: 'vendors' }
     return `Delete ${request.ids.length} selected ${labels[request.type] ?? 'items'}?`
   }
 
@@ -227,6 +321,7 @@
     if (type === 'guests') return 'Selected guests will be removed from the guest list and seating. Their gift records will remain, but will no longer be linked to a guest.'
     if (type === 'vendors') return 'Selected vendors and all of their saved contact, cost and booking details will be permanently removed.'
     if (type === 'messages') return 'Selected guest messages will be permanently removed.'
+    if (type === 'music') return 'Selected songs will be permanently removed from your music list.'
     return 'Selected gift records will be permanently removed.'
   }
 
@@ -250,6 +345,10 @@
       data = { ...data, messages: (data.messages ?? []).filter((message) => !deletedIds.has(message.id)) }
       selectedMessageIds = selectedMessageIds.filter((id) => !deletedIds.has(id))
       onNotify(`${ids.length} selected ${ids.length === 1 ? 'message' : 'messages'} removed.`)
+    } else if (type === 'music') {
+      data = { ...data, songs: (data.songs ?? []).filter((song) => !deletedIds.has(song.id)) }
+      selectedSongIds = selectedSongIds.filter((id) => !deletedIds.has(id))
+      onNotify(`${ids.length} selected ${ids.length === 1 ? 'song' : 'songs'} removed.`)
     } else if (type === 'vendors') {
       data = { ...data, vendors: (data.vendors ?? []).filter((vendor) => !deletedIds.has(vendor.id)) }
       selectedVendorIds = selectedVendorIds.filter((id) => !deletedIds.has(id))
@@ -382,6 +481,72 @@
     return tableGuests(tableId).reduce((count, guest) => count + guest.party, 0)
   }
 
+  function guestForSeat(tableId, seatIndex) {
+    let firstSeat = 0
+    for (const guest of tableGuests(tableId)) {
+      const lastSeat = firstSeat + Math.max(1, Number(guest.party) || 1)
+      if (seatIndex >= firstSeat && seatIndex < lastSeat) return guest
+      firstSeat = lastSeat
+    }
+    return null
+  }
+
+  function openGuestPickerForSeat(table, seatIndex) {
+    seatGuestSearch = ''
+    openSeatPicker = { tableId: table.id, tableName: table.name, seatIndex, guest: guestForSeat(table.id, seatIndex) }
+  }
+
+  function assignGuestFromSeatPicker(guest) {
+    if (!openSeatPicker) return
+    const table = data.tables.find((item) => item.id === openSeatPicker.tableId)
+    if (!table) return
+    if (!canSeatGuest(table, guest)) {
+      openSeatPicker = null
+      return
+    }
+    updateGuest(guest.id, { tableId: openSeatPicker.tableId })
+    clearSeatCapacityWarning()
+    onNotify(`${guest.name} assigned to ${openSeatPicker.tableName}.`)
+    openSeatPicker = null
+  }
+
+  function canSeatGuest(table, guest) {
+    const occupiedByOthers = tablePartyCount(table.id) - (guest.tableId === table.id ? guest.party : 0)
+    const requestedSeats = Math.max(1, Number(guest.party) || 1)
+    if (occupiedByOthers + requestedSeats <= table.capacity) return true
+
+    const message = `${guest.name} needs ${requestedSeats} seats, but only ${Math.max(0, table.capacity - occupiedByOthers)} ${table.capacity - occupiedByOthers === 1 ? 'seat is' : 'seats are'} left at ${table.name}.`
+    seatCapacityWarning = {
+      tableId: table.id,
+      message,
+    }
+    window.clearTimeout(seatCapacityWarningTimer)
+    seatCapacityWarningTimer = window.setTimeout(() => {
+      seatCapacityWarning = null
+      seatCapacityWarningTimer = undefined
+    }, 2000)
+    return false
+  }
+
+  function clearSeatCapacityWarning() {
+    window.clearTimeout(seatCapacityWarningTimer)
+    seatCapacityWarningTimer = undefined
+    seatCapacityWarning = null
+  }
+
+  function clearSelectedSeat() {
+    if (!openSeatPicker?.guest) return
+    const guest = openSeatPicker.guest
+    updateGuest(guest.id, { tableId: '' })
+    onNotify(`${guest.name} moved to unassigned guests.`)
+    openSeatPicker = null
+  }
+
+  function unassignGuestFromTable(guest) {
+    updateGuest(guest.id, { tableId: '' })
+    onNotify(`${guest.name} moved to unassigned guests.`)
+  }
+
   function setFloorTableShape(shape) {
     data = { ...data, floorPlan: { ...data.floorPlan, tableShape: shape } }
   }
@@ -442,7 +607,14 @@
 
   function dropGuest(tableId) {
     if (!draggedGuestId) return
-    updateGuest(draggedGuestId, { tableId })
+    const guest = data.guests.find((item) => item.id === draggedGuestId)
+    const table = data.tables.find((item) => item.id === tableId)
+    if (table && guest && !canSeatGuest(table, guest)) {
+      draggedGuestId = ''
+      return
+    }
+    if (guest) updateGuest(draggedGuestId, { tableId })
+    clearSeatCapacityWarning()
     draggedGuestId = ''
   }
 
@@ -745,6 +917,35 @@
     if (guest) navigate('gifts')
   }
 
+  function songTypeLabel(type) {
+    return ({ entrance: 'Entrance', 'first-dance': 'First dance', party: 'Party', reception: 'Reception', other: 'Other' })[type] ?? 'Other'
+  }
+
+  function addSong(event) {
+    event.preventDefault()
+    if (!musicForm.name.trim()) return
+    data = { ...data, songs: [createSong(musicForm), ...(data.songs ?? [])] }
+    musicForm = { name: '', link: '', type: 'other' }
+    showMusicForm = false
+    onNotify('Song added to your music list.')
+  }
+
+  function openMusicForm() {
+    musicForm = { name: '', link: '', type: 'other' }
+    showMusicForm = true
+  }
+
+  function removeSong(songId) {
+    data = { ...data, songs: (data.songs ?? []).filter((song) => song.id !== songId) }
+    selectedSongIds = selectedSongIds.filter((id) => id !== songId)
+    onNotify('Song removed.')
+  }
+
+  function songLinkHref(link) {
+    if (!link) return ''
+    return /^https?:\/\//i.test(link) ? link : `https://${link}`
+  }
+
   function addVendor(event) {
     event.preventDefault()
     if (!vendorForm.name.trim()) return
@@ -824,13 +1025,25 @@
   }
 
   function downloadGiftCsv() {
-    downloadCsv('gift-list.csv', ['Guest', 'Gift type', 'Amount or gift', 'Note', 'Thank you'], data.gifts.map((gift) => [
+    downloadCsv('gift-list.csv', ['Guest', 'Gift type', 'Amount or gift', 'Note', 'Thank you'], sortedGifts.map((gift) => [
       gift.guest,
       gift.type === 'money' ? 'Money' : 'Item',
       giftLabel(gift),
       gift.note,
       gift.thanked ? 'Thanked' : 'Pending',
     ]))
+  }
+
+  function downloadMessageCsv() {
+    downloadCsv('guest-messages.csv', ['Guest', 'Date sent', 'Email', 'Phone', 'Message', 'Status'], sortedMessages.map((message) => [message.name, formatMessageDate(message.sentAt), message.email, message.phone, message.message, message.read ? 'Read' : 'Unread']))
+  }
+
+  function downloadMusicCsv() {
+    downloadCsv('music-list.csv', ['Song', 'Link', 'Type'], sortedSongs.map((song) => [song.name, song.link, songTypeLabel(song.type)]))
+  }
+
+  function downloadVendorCsv() {
+    downloadCsv('vendors.csv', ['Vendor', 'Category', 'Contact', 'Email', 'Phone', 'Website', 'Estimated cost', 'Deposit', 'Status', 'Notes'], sortedVendors.map((vendor) => [vendor.name, vendor.category, vendor.contact, vendor.email, vendor.phone, vendor.website, vendor.cost, vendor.deposit, vendor.status, vendor.note]))
   }
 
   function toggleThanked(giftId) {
@@ -916,136 +1129,67 @@
     showGuestForm = false
     showTableForm = false
     showGiftForm = false
+    showMusicForm = false
     showVendorForm = false
   }
 
-  function noteContent(node, html) {
-    node.innerHTML = html ?? ''
-    return {
-      update(nextHtml) {
-        if (document.activeElement !== node && node.innerHTML !== (nextHtml ?? '')) node.innerHTML = nextHtml ?? ''
-      },
-    }
+  function formatCalendarDate(date) {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
   }
 
-  function updateNotesItems(updater) {
-    const notesBoard = data.notesBoard ?? { items: [] }
-    data = { ...data, notesBoard: { ...notesBoard, items: updater(notesBoard.items ?? []) } }
+  function notesCalendarData() {
+    return data.notesCalendar ?? { events: [], dailyNotes: {}, fixedNotes: '' }
   }
 
-  function addNoteCard(kind = 'note') {
-    const items = data.notesBoard?.items ?? []
-    const index = items.length
-    const item = {
-      id: `note-${Date.now()}-${index}`,
-      type: 'card',
-      kind,
-      x: 24 + (index % 3) * 38,
-      y: 24 + (index % 4) * 34,
-      html: kind === 'checklist'
-        ? '<label class="notes-check-row"><input type="checkbox"><span>Checklist item</span></label>'
-        : '<p>Start writing…</p>',
-    }
-    updateNotesItems((current) => [...current, item])
-    activeNoteId = item.id
-    tick().then(() => document.querySelector(`[data-note-editor="${item.id}"]`)?.focus())
+  function updateNotesCalendar(changes) {
+    data = { ...data, notesCalendar: { ...notesCalendarData(), ...changes } }
   }
 
-  function updateNoteHtml(noteId, html) {
-    updateNotesItems((items) => items.map((item) => item.id === noteId ? { ...item, html } : item))
+  function changeCalendarMonth(offset) {
+    calendarCursor = new Date(calendarCursor.getFullYear(), calendarCursor.getMonth() + offset, 1)
   }
 
-  function formatActiveNote(command, value = null) {
-    const editor = document.querySelector(`[data-note-editor="${activeNoteId}"]`)
-    if (!editor) return
-    editor.focus()
-    if (noteSelection?.id === activeNoteId) {
-      const selection = window.getSelection()
-      selection.removeAllRanges()
-      selection.addRange(noteSelection.range)
-    }
-    document.execCommand(command, false, value)
-    updateNoteHtml(activeNoteId, editor.innerHTML)
-    saveNoteSelection(activeNoteId)
+  function goToToday() {
+    const today = new Date()
+    calendarCursor = new Date(today.getFullYear(), today.getMonth(), 1)
+    selectedDayKey = formatCalendarDate(today)
   }
 
-  function saveNoteSelection(noteId) {
-    const selection = window.getSelection()
-    if (!selection?.rangeCount) return
-    const editor = document.querySelector(`[data-note-editor="${noteId}"]`)
-    if (!editor?.contains(selection.anchorNode)) return
-    noteSelection = { id: noteId, range: selection.getRangeAt(0).cloneRange() }
+  function toggleNotesSection(section) {
+    notesSectionsCollapsed = { ...notesSectionsCollapsed, [section]: !notesSectionsCollapsed[section] }
   }
 
-  function updateNoteEditor(noteId, editor) {
-    editor.querySelectorAll('input[type="checkbox"]').forEach((input) => input.toggleAttribute('checked', input.checked))
-    updateNoteHtml(noteId, editor.innerHTML)
-    saveNoteSelection(noteId)
-  }
-
-  function removeNoteItem(noteId) {
-    updateNotesItems((items) => items.filter((item) => item.id !== noteId))
-    if (activeNoteId === noteId) activeNoteId = ''
-  }
-
-  function uploadNoteImages(event) {
-    const files = [...(event.currentTarget.files ?? [])].filter((file) => file.type.startsWith('image/'))
-    const startingCount = data.notesBoard?.items?.length ?? 0
-    files.forEach((file, fileIndex) => {
-      const reader = new FileReader()
-      reader.onload = () => {
-        const index = startingCount + fileIndex
-        const item = {
-          id: `note-image-${Date.now()}-${fileIndex}`,
-          type: 'image',
-          x: 32 + (index % 3) * 44,
-          y: 38 + (index % 4) * 38,
-          src: reader.result,
-          alt: file.name,
-        }
-        updateNotesItems((items) => [...items, item])
-      }
-      reader.readAsDataURL(file)
-    })
-    event.currentTarget.value = ''
-  }
-
-  function beginNotesGesture(event) {
-    if (active !== 'notes' || event.button !== 0) return
-    const dragHandle = event.target.closest?.('[data-notes-drag]')
-    const board = event.target.closest?.('.notes-board')
-    if (!dragHandle || !board || event.target.closest?.('button, input, [contenteditable="true"]')) return
-    const itemId = dragHandle.dataset.notesDrag
-    const item = (data.notesBoard?.items ?? []).find((entry) => entry.id === itemId)
-    const itemNode = board.querySelector(`[data-notes-item="${itemId}"]`)
-    if (!item || !itemNode) return
-    const boardBounds = board.getBoundingClientRect()
-    const itemBounds = itemNode.getBoundingClientRect()
-    notesGesture = {
-      id: itemId,
-      offsetX: event.clientX - itemBounds.left,
-      offsetY: event.clientY - itemBounds.top,
-      boardWidth: boardBounds.width,
-      boardHeight: boardBounds.height,
-      itemWidth: itemBounds.width,
-      itemHeight: itemBounds.height,
-    }
-    activeNoteId = item.type === 'card' ? item.id : ''
+  function addCalendarEvent(event) {
     event.preventDefault()
+    const title = calendarEventForm.title.trim()
+    if (!title) return
+    const notes = notesCalendarData()
+    const calendarEvent = {
+      id: `calendar-event-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`,
+      date: selectedDayKey,
+      title,
+      time: calendarEventForm.time,
+    }
+    updateNotesCalendar({ events: [...(notes.events ?? []), calendarEvent] })
+    calendarEventForm = { title: '', time: '' }
+    calendarEventFormOpen = false
   }
 
-  function moveNotesGesture(event) {
-    if (!notesGesture || active !== 'notes') return
-    const board = document.querySelector('.notes-board')
-    if (!board) return
-    const bounds = board.getBoundingClientRect()
-    const x = Math.max(0, Math.min(bounds.width - notesGesture.itemWidth, event.clientX - bounds.left - notesGesture.offsetX))
-    const y = Math.max(0, Math.min(bounds.height - notesGesture.itemHeight, event.clientY - bounds.top - notesGesture.offsetY))
-    updateNotesItems((items) => items.map((item) => item.id === notesGesture.id ? { ...item, x, y } : item))
+  function removeCalendarEvent(eventId) {
+    const notes = notesCalendarData()
+    updateNotesCalendar({ events: (notes.events ?? []).filter((event) => event.id !== eventId) })
   }
 
-  function finishNotesGesture() {
-    notesGesture = null
+  function updateSelectedDayNotes(value) {
+    const notes = notesCalendarData()
+    updateNotesCalendar({ dailyNotes: { ...(notes.dailyNotes ?? {}), [selectedDayKey]: value } })
+  }
+
+  function updateFixedNotes(value) {
+    updateNotesCalendar({ fixedNotes: value })
   }
 </script>
 
@@ -1055,10 +1199,10 @@
     if (event.key === 'Escape') openGuestMenuId = ''
     handleFloorShapeDeleteKey(event)
   }}
-  onpointerdown={(event) => { beginFloorGesture(event); beginNotesGesture(event) }}
-  onpointermove={(event) => { moveFloorGesture(event); moveNotesGesture(event) }}
-  onpointerup={() => { finishFloorGesture(); finishNotesGesture() }}
-  onpointercancel={() => { finishFloorGesture(); finishNotesGesture() }}
+  onpointerdown={beginFloorGesture}
+  onpointermove={moveFloorGesture}
+  onpointerup={finishFloorGesture}
+  onpointercancel={finishFloorGesture}
   ondblclick={handleFloorShapeDoubleClick}
 />
 
@@ -1097,7 +1241,6 @@
     </nav>
 
     <div class="dashboard-sidebar__footer">
-      <button type="button" onclick={onHome}><span aria-hidden="true">←</span> Back to storefront</button>
       <div class="dashboard-account">
         <i>{initials()}</i>
         <span><strong>{account.firstName} {account.lastName}</strong><small>{account.email}</small></span>
@@ -1178,31 +1321,23 @@
         <section class="dashboard-view" aria-labelledby="guests-heading">
           <header class="dashboard-page-heading">
             <div><h1 id="guests-heading">Guest list</h1><p>Keep every invitation, reply and dietary note together.</p></div>
-            <label class="guest-heading-search">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg>
-              <input bind:value={guestSearch} placeholder="Search guests" aria-label="Search guests or email" />
-              <span aria-label={`${filteredGuests.length} guests shown`}>{filteredGuests.length}</span>
-            </label>
+            <button class="dashboard-primary" type="button" onclick={openGuestRow}>+ Add guest</button>
           </header>
 
-          <div class="rsvp-stat-grid"><button class:active={rsvpFilter === 'all'} onclick={() => (rsvpFilter = 'all')} type="button"><span>All guests</span><strong>{summary.total}</strong></button><button class:active={rsvpFilter === 'attending'} onclick={() => (rsvpFilter = 'attending')} type="button"><span>Attending</span><strong>{summary.attending}</strong></button><button class:active={rsvpFilter === 'pending'} onclick={() => (rsvpFilter = 'pending')} type="button"><span>Awaiting reply</span><strong>{summary.pending}</strong></button><button class:active={rsvpFilter === 'declined'} onclick={() => (rsvpFilter = 'declined')} type="button"><span>Declined</span><strong>{summary.declined}</strong></button></div>
-          {#if visibleSelectedGuestIds.length > 0}
-            <div class="bulk-action-toolbar" role="toolbar" aria-label="Selected guest actions">
-              <span>{visibleSelectedGuestIds.length} selected</span>
-              <label class="bulk-rsvp-control"><select aria-label="Change RSVP for selected guests" onchange={(event) => updateSelectedGuestStatus(event.currentTarget.value)}><option value="" selected disabled>RSVP</option><option value="attending">Attending</option><option value="pending">Pending</option><option value="declined">Declined</option></select></label>
-              <button type="button" class="bulk-delete-button" aria-label="Delete selected guests" title="Delete selected" onclick={() => requestBulkDelete('guests')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button>
-            </div>
-          {/if}
+          <div class="table-topbar">
+            <div class="table-topbar-left"><label class="table-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={guestSearch} placeholder="Search guests" aria-label="Search guests or email" /><span>{filteredGuests.length}</span></label>{#if visibleSelectedGuestIds.length > 0}<div class="table-selected-actions"><span>{visibleSelectedGuestIds.length} selected</span><label class="bulk-rsvp-control"><select aria-label="Change RSVP for selected guests" onchange={(event) => updateSelectedGuestStatus(event.currentTarget.value)}><option value="" selected disabled>RSVP</option><option value="attending">Attending</option><option value="pending">Pending</option><option value="declined">Declined</option></select></label><button type="button" class="bulk-delete-button" aria-label="Delete selected guests" title="Delete selected" onclick={() => requestBulkDelete('guests')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div>
+            <div class="table-topbar-right"><div class="table-filter-chips" role="group" aria-label="Filter guests by RSVP"><button class:active={rsvpFilter === 'all'} type="button" onclick={() => (rsvpFilter = 'all')}>All <strong>{summary.total}</strong></button><button class:active={rsvpFilter === 'attending'} type="button" onclick={() => (rsvpFilter = 'attending')}>Attending <strong>{summary.attending}</strong></button><button class:active={rsvpFilter === 'pending'} type="button" onclick={() => (rsvpFilter = 'pending')}>Pending <strong>{summary.pending}</strong></button><button class:active={rsvpFilter === 'declined'} type="button" onclick={() => (rsvpFilter = 'declined')}>Declined <strong>{summary.declined}</strong></button></div><button class="table-download-button" type="button" onclick={downloadGuestCsv} aria-label="Download guest list CSV" title="Download CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div>
+          </div>
 
           <div class="dashboard-table-wrap">
             <table class="dashboard-data-table dashboard-guest-table">
               <thead><tr>
-                <th aria-sort={guestSort.key === 'name' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><div class="bulk-header-cell"><input class="bulk-select-checkbox" use:setIndeterminate={someVisibleGuestsSelected} type="checkbox" checked={allVisibleGuestsSelected} onchange={(event) => selectVisibleGuests(event.currentTarget.checked)} aria-label="Select all visible guests" /><button class="guest-sort-button" class:sorted={guestSort.key === 'name'} type="button" onclick={() => sortGuests('name')}>Name <span aria-hidden="true">{guestSort.key === 'name' && guestSort.direction === 'desc' ? '↓' : '↑'}</span></button></div></th>
-                <th aria-sort={guestSort.key === 'party' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={guestSort.key === 'party'} type="button" onclick={() => sortGuests('party')}>Number of people <span aria-hidden="true">{guestSort.key === 'party' && guestSort.direction === 'desc' ? '↓' : '↑'}</span></button></th>
-                <th aria-sort={guestSort.key === 'email' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={guestSort.key === 'email'} type="button" onclick={() => sortGuests('email')}>Contact details <span aria-hidden="true">{guestSort.key === 'email' && guestSort.direction === 'desc' ? '↓' : '↑'}</span></button></th>
-                <th>Note</th>
-                <th>RSVP</th>
-                <th class="guest-action-heading"><div class="table-header-actions"><button class="guest-add-icon dashboard-primary" type="button" onclick={openGuestRow}><span aria-hidden="true">+</span> Add</button><button class="csv-download-button" type="button" onclick={downloadGuestCsv} aria-label="Download CSV" data-tooltip="Download CSV" title="Download CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></th>
+                <th aria-sort={guestSort.key === 'name' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><div class="bulk-header-cell"><input class="bulk-select-checkbox" use:setIndeterminate={someVisibleGuestsSelected} type="checkbox" checked={allVisibleGuestsSelected} onchange={(event) => selectVisibleGuests(event.currentTarget.checked)} aria-label="Select all visible guests" /><button class="guest-sort-button" class:sorted={guestSort.key === 'name'} type="button" onclick={() => sortGuests('name')}>Name <span aria-hidden="true">{sortArrow(guestSort, 'name')}</span></button></div></th>
+                <th aria-sort={guestSort.key === 'party' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={guestSort.key === 'party'} type="button" onclick={() => sortGuests('party')}>Number of people <span aria-hidden="true">{sortArrow(guestSort, 'party')}</span></button></th>
+                <th aria-sort={guestSort.key === 'email' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={guestSort.key === 'email'} type="button" onclick={() => sortGuests('email')}>Contact details <span aria-hidden="true">{sortArrow(guestSort, 'email')}</span></button></th>
+                <th aria-sort={guestSort.key === 'meal' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={guestSort.key === 'meal'} type="button" onclick={() => sortGuests('meal')}>Note <span aria-hidden="true">{sortArrow(guestSort, 'meal')}</span></button></th>
+                <th aria-sort={guestSort.key === 'status' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={guestSort.key === 'status'} type="button" onclick={() => sortGuests('status')}>RSVP <span aria-hidden="true">{sortArrow(guestSort, 'status')}</span></button></th>
+                <th class="guest-action-heading"><span class="sr-only">Actions</span></th>
               </tr></thead>
               <tbody>
                 {#if showGuestForm}
@@ -1289,9 +1424,10 @@
         <section class="dashboard-view" aria-labelledby="seating-heading">
           <header class="dashboard-page-heading">
             <div><h1 id="seating-heading">Table seating</h1><p>Drag guests between tables, then adjust table sizes as your plan changes.</p></div>
+            <button class="dashboard-primary" type="button" onclick={() => (showTableForm = true)}>+ Add table</button>
           </header>
 
-          <div class="seating-summary"><span><strong>{data.tables.length}</strong> tables</span><span><strong>{summary.attending}</strong> attending</span><span><strong>{unassignedGuests.reduce((total, guest) => total + guest.party, 0)}</strong> seats unassigned</span><div class="seating-view-switch" role="group" aria-label="Seating view"><button class:active={seatingView === 'tables'} type="button" aria-pressed={seatingView === 'tables'} onclick={() => (seatingView = 'tables')}>Tables</button><button class:active={seatingView === 'floor'} type="button" aria-pressed={seatingView === 'floor'} onclick={() => (seatingView = 'floor')}>Floor plan</button></div></div>
+          <div class="seating-summary"><span><strong>{data.tables.length}</strong> tables</span><span><strong>{summary.attending}</strong> attending</span><span><strong>{unassignedGuests.reduce((total, guest) => total + guest.party, 0)}</strong> seats unassigned</span></div>
 
           <div class="seating-controls">
             <div class="table-shape-setting">
@@ -1315,7 +1451,7 @@
             {:else}
               <span class="seating-tools-placeholder" aria-hidden="true"></span>
             {/if}
-            <button class="dashboard-primary seating-add-table" type="button" onclick={() => (showTableForm = true)}>+ Add table</button>
+            <div class="seating-view-switch" role="group" aria-label="Seating view"><button class:active={seatingView === 'tables'} type="button" aria-pressed={seatingView === 'tables'} onclick={() => (seatingView = 'tables')}>Tables</button><button class:active={seatingView === 'floor'} type="button" aria-pressed={seatingView === 'floor'} onclick={() => (seatingView = 'floor')}>Floor plan</button></div>
           </div>
 
           {#if seatingView === 'tables' && unassignedGuests.length > 0}
@@ -1379,7 +1515,7 @@
                         <div class="floor-table-popover" role="dialog" tabindex="-1" aria-label={`${table.name} seated guests`}>
                           <header><strong>{table.name}</strong><button type="button" aria-label="Close guest list" onclick={() => (openFloorTableId = '')}>×</button></header>
                           {#if seated.length > 0}
-                            <ul>{#each seated as guest (guest.id)}<li>{guest.name}</li>{/each}</ul>
+                            <ul>{#each seated as guest (guest.id)}<li><span>{guest.name}</span><button type="button" title="Unassign guest" aria-label={`Unassign ${guest.name} from ${table.name}`} onclick={() => unassignGuestFromTable(guest)}>×</button></li>{/each}</ul>
                           {:else}
                             <p>No guests seated yet.</p>
                           {/if}
@@ -1398,9 +1534,10 @@
               {@const occupied = tablePartyCount(table.id)}
               <article class:over-capacity={occupied > table.capacity} class="seating-table" ondragover={(event) => event.preventDefault()} ondrop={() => dropGuest(table.id)}>
                 <header><span>0{tableIndex + 1}</span><div><input value={table.name} onchange={(event) => (data = { ...data, tables: data.tables.map((item) => item.id === table.id ? { ...item, name: event.currentTarget.value } : item) })} aria-label="Table name" /><small>{occupied} of {table.capacity} seats</small></div><button type="button" onclick={() => removeTable(table.id)} aria-label={`Remove ${table.name}`}>×</button></header>
-                <div class={`seating-table__visual seating-table__visual--${floorTableShape}`}><div><strong>{table.name}</strong><span>{table.capacity} seats</span></div>{#each Array(table.capacity) as _, seat}<i class:filled={seat < occupied} style={seatDotStyle(seat, table.capacity, floorTableShape, 'list')}></i>{/each}</div>
-                <div class="seating-table__guests">
-                  {#each seated as guest}<button draggable="true" ondragstart={() => (draggedGuestId = guest.id)} type="button"><i class={avatarTone(guest.id || guest.name)}>{guest.name.slice(0, 1)}</i><span>{guest.name}<small>Party of {guest.party}</small></span><b>⋮⋮</b></button>{/each}
+                <div class:capacity-warning={seatCapacityWarning?.tableId === table.id} class={`seating-table__visual seating-table__visual--${floorTableShape}`}><div><strong>{table.name}</strong><span>{table.capacity} seats</span></div>{#each Array(table.capacity) as _, seat}{@const seatedGuest = guestForSeat(table.id, seat)}<button class:filled={Boolean(seatedGuest)} class:warning={seatCapacityWarning?.tableId === table.id && !seatedGuest} class="seating-chair" style={seatDotStyle(seat, table.capacity, floorTableShape, 'list')} type="button" aria-label={seatedGuest ? `Seat ${seat + 1}, ${seatedGuest.name}. Choose guest` : `Seat ${seat + 1}, empty. Choose guest`} title={seatedGuest?.name ?? 'Choose guest'} onclick={() => openGuestPickerForSeat(table, seat)}></button>{/each}</div>
+                {#if seatCapacityWarning?.tableId === table.id}<p class="seating-capacity-warning" role="alert"><strong>Not enough seats</strong>{seatCapacityWarning.message}</p>{/if}
+                <div class="seating-table__guests" role="list">
+                  {#each seated as guest}<div class="seating-guest-row" role="listitem" draggable="true" ondragstart={() => (draggedGuestId = guest.id)}><i class={avatarTone(guest.id || guest.name)}>{guest.name.slice(0, 1)}</i><span>{guest.name}<small>Party of {guest.party}</small></span><b aria-hidden="true">⋮⋮</b><button type="button" title="Unassign guest" aria-label={`Unassign ${guest.name} from ${table.name}`} onclick={() => unassignGuestFromTable(guest)}>×</button></div>{/each}
                   {#if seated.length === 0}<p>Drop guests here</p>{/if}
                 </div>
               </article>
@@ -1422,11 +1559,18 @@
 
       {:else if active === 'gifts'}
         <section class="dashboard-view" aria-labelledby="gifts-heading">
-          <header class="dashboard-page-heading"><div><h1 id="gifts-heading">Gift list</h1><p>Track monetary gifts and meaningful items, linked directly to your guests.</p></div></header>
-          <div class="gift-summary"><span><strong>{data.gifts.length}</strong> gifts received</span><span><strong>{data.gifts.filter((gift) => gift.thanked).length}</strong> thank-yous sent</span>{#if visibleSelectedGiftIds.length > 0}<div class="summary-bulk-actions" role="toolbar" aria-label="Selected gift actions"><span>{visibleSelectedGiftIds.length} selected</span><button type="button" class="bulk-delete-button" aria-label="Delete selected gifts" title="Delete selected" onclick={() => requestBulkDelete('gifts')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}<i style={`--progress:${(data.gifts.filter((gift) => gift.thanked).length / Math.max(1, data.gifts.length)) * 100}%`}></i></div>
+          <header class="dashboard-page-heading"><div><h1 id="gifts-heading">Gift list</h1><p>Track monetary gifts and meaningful items, linked directly to your guests.</p></div><button class="dashboard-primary" type="button" onclick={() => openGiftForm()}>+ Add gift</button></header>
+          <div class="table-topbar"><div class="table-topbar-left"><label class="table-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={giftSearch} placeholder="Search gifts" aria-label="Search gifts" /><span>{filteredGifts.length}</span></label>{#if visibleSelectedGiftIds.length > 0}<div class="table-selected-actions"><span>{visibleSelectedGiftIds.length} selected</span><button type="button" class="bulk-delete-button" aria-label="Delete selected gifts" title="Delete selected" onclick={() => requestBulkDelete('gifts')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div><div class="table-topbar-right"><div class="table-filter-chips" role="group" aria-label="Filter gifts"><button class:active={giftFilter === 'all'} type="button" onclick={() => (giftFilter = 'all')}>All <strong>{data.gifts.length}</strong></button><button class:active={giftFilter === 'thanked'} type="button" onclick={() => (giftFilter = 'thanked')}>Thanked <strong>{data.gifts.filter((gift) => gift.thanked).length}</strong></button><button class:active={giftFilter === 'pending'} type="button" onclick={() => (giftFilter = 'pending')}>Pending <strong>{data.gifts.filter((gift) => !gift.thanked).length}</strong></button></div><button class="table-download-button" type="button" onclick={downloadGiftCsv} aria-label="Download gift list CSV" title="Download CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></div>
           <div class="dashboard-table-wrap">
             <table class="dashboard-data-table dashboard-gift-table">
-              <thead><tr><th><div class="bulk-header-cell"><input class="bulk-select-checkbox" use:setIndeterminate={someGiftsSelected} type="checkbox" checked={allGiftsSelected} onchange={(event) => selectAllGifts(event.currentTarget.checked)} aria-label="Select all gifts" /><span>Guest</span></div></th><th>Gift type</th><th>Amount or gift</th><th>Note</th><th>Thank you</th><th class="table-actions-heading"><span class="sr-only">Actions</span><div class="table-header-actions"><button class="guest-add-icon dashboard-primary" type="button" onclick={() => openGiftForm()}> <span aria-hidden="true">+</span> Add</button><button class="csv-download-button" type="button" onclick={downloadGiftCsv} aria-label="Download CSV" data-tooltip="Download CSV" title="Download CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></th></tr></thead>
+              <thead><tr>
+                <th aria-sort={giftSort.key === 'guest' ? (giftSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><div class="bulk-header-cell"><input class="bulk-select-checkbox" use:setIndeterminate={someGiftsSelected} type="checkbox" checked={allGiftsSelected} onchange={(event) => selectAllGifts(event.currentTarget.checked)} aria-label="Select all gifts" /><button class="guest-sort-button" class:sorted={giftSort.key === 'guest'} type="button" onclick={() => toggleTableSort('gifts', 'guest')}>Guest <span aria-hidden="true">{sortArrow(giftSort, 'guest')}</span></button></div></th>
+                <th aria-sort={giftSort.key === 'type' ? (giftSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={giftSort.key === 'type'} type="button" onclick={() => toggleTableSort('gifts', 'type')}>Gift type <span aria-hidden="true">{sortArrow(giftSort, 'type')}</span></button></th>
+                <th aria-sort={giftSort.key === 'giftValue' ? (giftSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={giftSort.key === 'giftValue'} type="button" onclick={() => toggleTableSort('gifts', 'giftValue')}>Amount or gift <span aria-hidden="true">{sortArrow(giftSort, 'giftValue')}</span></button></th>
+                <th aria-sort={giftSort.key === 'note' ? (giftSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={giftSort.key === 'note'} type="button" onclick={() => toggleTableSort('gifts', 'note')}>Note <span aria-hidden="true">{sortArrow(giftSort, 'note')}</span></button></th>
+                <th aria-sort={giftSort.key === 'thanked' ? (giftSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={giftSort.key === 'thanked'} type="button" onclick={() => toggleTableSort('gifts', 'thanked')}>Thank you <span aria-hidden="true">{sortArrow(giftSort, 'thanked')}</span></button></th>
+                <th class="table-actions-heading"><span class="sr-only">Actions</span></th>
+              </tr></thead>
               <tbody>
                 {#if showGiftForm}
                   <tr class="dashboard-inline-row dashboard-inline-gift-row">
@@ -1438,16 +1582,43 @@
                     <td><div class="inline-row-actions"><button type="button" onclick={addGift}>Save</button><button type="button" onclick={() => (showGiftForm = false)}>Cancel</button></div></td>
                   </tr>
                 {/if}
-                {#each data.gifts as gift}<tr class:thanked={gift.thanked}><td><input class="bulk-select-checkbox" type="checkbox" checked={selectedGiftIds.includes(gift.id)} onchange={() => toggleGiftSelection(gift.id)} aria-label={`Select gift from ${gift.guest}`} /><i class={avatarTone(gift.guestId || gift.guest)}>{gift.guest.slice(0, 1)}</i><span><strong>{gift.guest}</strong><small>{gift.guestId ? 'Guest list' : 'Not on guest list'}</small></span></td><td><span class={`gift-type gift-type--${gift.type}`}>{gift.type === 'money' ? 'Money' : 'Item'}</span></td><td><strong class="gift-value">{giftLabel(gift)}</strong></td><td><span class="gift-note">{gift.note || 'No note added'}</span></td><td><button class="gift-thank-toggle" class:active={gift.thanked} type="button" onclick={() => toggleThanked(gift.id)} aria-pressed={gift.thanked}><i>{gift.thanked ? '✓' : ''}</i>{gift.thanked ? 'Thanked' : 'Pending'}</button></td><td><button class="dashboard-row-remove" type="button" onclick={() => removeGift(gift.id)} aria-label={`Remove gift from ${gift.guest}`}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></td></tr>{/each}
+                {#each sortedGifts as gift}<tr class:thanked={gift.thanked}><td><input class="bulk-select-checkbox" type="checkbox" checked={selectedGiftIds.includes(gift.id)} onchange={() => toggleGiftSelection(gift.id)} aria-label={`Select gift from ${gift.guest}`} /><i class={avatarTone(gift.guestId || gift.guest)}>{gift.guest.slice(0, 1)}</i><span><strong>{gift.guest}</strong><small>{gift.guestId ? 'Guest list' : 'Not on guest list'}</small></span></td><td><span class={`gift-type gift-type--${gift.type}`}>{gift.type === 'money' ? 'Money' : 'Item'}</span></td><td><strong class="gift-value">{giftLabel(gift)}</strong></td><td><span class="gift-note">{gift.note || 'No note added'}</span></td><td><button class="gift-thank-toggle" class:active={gift.thanked} type="button" onclick={() => toggleThanked(gift.id)} aria-pressed={gift.thanked}><i>{gift.thanked ? '✓' : ''}</i>{gift.thanked ? 'Thanked' : 'Pending'}</button></td><td><button class="dashboard-row-remove" type="button" onclick={() => removeGift(gift.id)} aria-label={`Remove gift from ${gift.guest}`}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></td></tr>{/each}
               </tbody>
             </table>
           </div>
         </section>
 
       {:else if active === 'music'}
-        <section class="dashboard-view" aria-labelledby={`${active}-heading`}>
-          <header class="dashboard-page-heading"><div><h1 id={`${active}-heading`}>{navItems.find((item) => item.id === active)?.label}</h1></div></header>
-          <section class="dashboard-panel"><p>Coming soon</p></section>
+        <section class="dashboard-view" aria-labelledby="music-heading">
+          <header class="dashboard-page-heading"><div><h1 id="music-heading">Music</h1><p>Keep every important song and playlist link organized by moment.</p></div><button class="dashboard-primary" type="button" onclick={openMusicForm}>+ Add song</button></header>
+
+          <div class="table-topbar"><div class="table-topbar-left"><label class="table-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={musicSearch} placeholder="Search music" aria-label="Search songs or links" /><span>{filteredSongs.length}</span></label>{#if visibleSelectedSongIds.length > 0}<div class="table-selected-actions"><span>{visibleSelectedSongIds.length} selected</span><button type="button" class="bulk-delete-button" aria-label="Delete selected songs" title="Delete selected" onclick={() => requestBulkDelete('music')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div><div class="table-topbar-right"><div class="table-filter-chips" role="group" aria-label="Filter music by type"><button class:active={musicFilter === 'all'} type="button" onclick={() => (musicFilter = 'all')}>All <strong>{(data.songs ?? []).length}</strong></button><button class:active={musicFilter === 'entrance'} type="button" onclick={() => (musicFilter = 'entrance')}>Entrance <strong>{(data.songs ?? []).filter((song) => song.type === 'entrance').length}</strong></button><button class:active={musicFilter === 'first-dance'} type="button" onclick={() => (musicFilter = 'first-dance')}>First dance <strong>{(data.songs ?? []).filter((song) => song.type === 'first-dance').length}</strong></button><button class:active={musicFilter === 'party'} type="button" onclick={() => (musicFilter = 'party')}>Party <strong>{(data.songs ?? []).filter((song) => song.type === 'party').length}</strong></button><button class:active={musicFilter === 'reception'} type="button" onclick={() => (musicFilter = 'reception')}>Reception <strong>{(data.songs ?? []).filter((song) => song.type === 'reception').length}</strong></button><button class:active={musicFilter === 'other'} type="button" onclick={() => (musicFilter = 'other')}>Other <strong>{(data.songs ?? []).filter((song) => song.type === 'other').length}</strong></button></div><button class="table-download-button" type="button" onclick={downloadMusicCsv} aria-label="Download music list CSV" title="Download CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></div>
+
+          <div class="dashboard-table-wrap">
+            <table class="dashboard-data-table dashboard-music-table">
+              <thead><tr>
+                <th aria-sort={musicSort.key === 'name' ? (musicSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><div class="bulk-header-cell"><input class="bulk-select-checkbox" use:setIndeterminate={someSongsSelected} type="checkbox" checked={allSongsSelected} onchange={(event) => selectAllSongs(event.currentTarget.checked)} aria-label="Select all songs" /><button class="guest-sort-button" class:sorted={musicSort.key === 'name'} type="button" onclick={() => toggleTableSort('music', 'name')}>Song <span aria-hidden="true">{sortArrow(musicSort, 'name')}</span></button></div></th>
+                <th aria-sort={musicSort.key === 'link' ? (musicSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={musicSort.key === 'link'} type="button" onclick={() => toggleTableSort('music', 'link')}>Link <span aria-hidden="true">{sortArrow(musicSort, 'link')}</span></button></th>
+                <th aria-sort={musicSort.key === 'type' ? (musicSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={musicSort.key === 'type'} type="button" onclick={() => toggleTableSort('music', 'type')}>Type <span aria-hidden="true">{sortArrow(musicSort, 'type')}</span></button></th>
+                <th><span class="sr-only">Actions</span></th>
+              </tr></thead>
+              <tbody>
+                {#if showMusicForm}
+                  <tr class="dashboard-inline-row dashboard-inline-music-row">
+                    <td><input bind:value={musicForm.name} aria-label="Song name" required placeholder="Song name and artist" /></td>
+                    <td><input bind:value={musicForm.link} type="text" aria-label="Song link" placeholder="https://…" /></td>
+                    <td><select bind:value={musicForm.type} aria-label="Song type"><option value="entrance">Entrance</option><option value="first-dance">First dance</option><option value="party">Party</option><option value="reception">Reception</option><option value="other">Other</option></select></td>
+                    <td><div class="inline-row-actions"><button type="button" onclick={addSong}>Save</button><button type="button" onclick={() => (showMusicForm = false)}>Cancel</button></div></td>
+                  </tr>
+                {/if}
+                {#each sortedSongs as song (song.id)}
+                  <tr><td><input class="bulk-select-checkbox" type="checkbox" checked={selectedSongIds.includes(song.id)} onchange={() => toggleSongSelection(song.id)} aria-label={`Select ${song.name}`} /><span class="music-song-name"><i aria-hidden="true">♪</i><strong>{song.name}</strong></span></td><td>{#if song.link}<a class="music-link" href={songLinkHref(song.link)} target="_blank" rel="noreferrer">Open song <span aria-hidden="true">↗</span></a>{:else}<span class="music-no-link">No link</span>{/if}</td><td><span class={`music-type music-type--${song.type}`}>{songTypeLabel(song.type)}</span></td><td><button class="dashboard-row-remove" type="button" onclick={() => removeSong(song.id)} aria-label={`Remove ${song.name}`}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></td></tr>
+                {:else}
+                  {#if !showMusicForm}<tr class="music-empty-row"><td colspan="4"><p>No songs added yet. Add your first song to start planning the soundtrack.</p></td></tr>{/if}
+                {/each}
+              </tbody>
+            </table>
+          </div>
         </section>
 
       {:else if active === 'messages'}
@@ -1456,13 +1627,20 @@
             <div><h1 id="messages-heading">Messages</h1><p>Read the notes your guests leave through your event website.</p></div>
           </header>
 
-          <div class="message-summary"><span><strong>{(data.messages ?? []).length}</strong> messages</span><span><strong>{(data.messages ?? []).filter((message) => !message.read).length}</strong> unread</span>{#if visibleSelectedMessageIds.length > 0}<div class="summary-bulk-actions" role="toolbar" aria-label="Selected message actions"><span>{visibleSelectedMessageIds.length} selected</span><button type="button" class="bulk-delete-button" aria-label="Delete selected messages" title="Delete selected" onclick={() => requestBulkDelete('messages')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div>
+          <div class="table-topbar"><div class="table-topbar-left"><label class="table-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={messageSearch} placeholder="Search messages" aria-label="Search messages" /><span>{filteredMessages.length}</span></label>{#if visibleSelectedMessageIds.length > 0}<div class="table-selected-actions"><span>{visibleSelectedMessageIds.length} selected</span><button type="button" class="bulk-delete-button" aria-label="Delete selected messages" title="Delete selected" onclick={() => requestBulkDelete('messages')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div><div class="table-topbar-right"><div class="table-filter-chips" role="group" aria-label="Filter messages"><button class:active={messageFilter === 'all'} type="button" onclick={() => (messageFilter = 'all')}>All <strong>{(data.messages ?? []).length}</strong></button><button class:active={messageFilter === 'unread'} type="button" onclick={() => (messageFilter = 'unread')}>Unread <strong>{(data.messages ?? []).filter((message) => !message.read).length}</strong></button><button class:active={messageFilter === 'read'} type="button" onclick={() => (messageFilter = 'read')}>Read <strong>{(data.messages ?? []).filter((message) => message.read).length}</strong></button></div><button class="table-download-button" type="button" onclick={downloadMessageCsv} aria-label="Download messages CSV" title="Download CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></div>
 
           <div class="dashboard-table-wrap">
             <table class="dashboard-data-table dashboard-message-table">
-              <thead><tr><th><div class="bulk-header-cell"><input class="bulk-select-checkbox" use:setIndeterminate={someMessagesSelected} type="checkbox" checked={allMessagesSelected} onchange={(event) => selectAllMessages(event.currentTarget.checked)} aria-label="Select all messages" /><span>Guest</span></div></th><th>Date sent</th><th>Contact details</th><th>Message</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead>
+              <thead><tr>
+                <th aria-sort={messageSort.key === 'name' ? (messageSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><div class="bulk-header-cell"><input class="bulk-select-checkbox" use:setIndeterminate={someMessagesSelected} type="checkbox" checked={allMessagesSelected} onchange={(event) => selectAllMessages(event.currentTarget.checked)} aria-label="Select all messages" /><button class="guest-sort-button" class:sorted={messageSort.key === 'name'} type="button" onclick={() => toggleTableSort('messages', 'name')}>Guest <span aria-hidden="true">{sortArrow(messageSort, 'name')}</span></button></div></th>
+                <th aria-sort={messageSort.key === 'sentAt' ? (messageSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={messageSort.key === 'sentAt'} type="button" onclick={() => toggleTableSort('messages', 'sentAt')}>Date sent <span aria-hidden="true">{sortArrow(messageSort, 'sentAt')}</span></button></th>
+                <th aria-sort={messageSort.key === 'contact' ? (messageSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={messageSort.key === 'contact'} type="button" onclick={() => toggleTableSort('messages', 'contact')}>Contact details <span aria-hidden="true">{sortArrow(messageSort, 'contact')}</span></button></th>
+                <th aria-sort={messageSort.key === 'message' ? (messageSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={messageSort.key === 'message'} type="button" onclick={() => toggleTableSort('messages', 'message')}>Message <span aria-hidden="true">{sortArrow(messageSort, 'message')}</span></button></th>
+                <th aria-sort={messageSort.key === 'read' ? (messageSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={messageSort.key === 'read'} type="button" onclick={() => toggleTableSort('messages', 'read')}>Status <span aria-hidden="true">{sortArrow(messageSort, 'read')}</span></button></th>
+                <th><span class="sr-only">Actions</span></th>
+              </tr></thead>
               <tbody>
-                {#each data.messages ?? [] as message (message.id)}
+                {#each sortedMessages as message (message.id)}
                   <tr class:unread={!message.read}>
                     <td><input class="bulk-select-checkbox" type="checkbox" checked={selectedMessageIds.includes(message.id)} onchange={() => toggleMessageSelection(message.id)} aria-label={`Select message from ${message.name}`} /><i class={avatarTone(message.guestId || message.name)}>{message.name.slice(0, 1)}</i><span><strong>{message.name}</strong><small>{message.guestId ? 'Guest list' : 'Website visitor'}</small></span></td>
                     <td><time datetime={message.sentAt}>{formatMessageDate(message.sentAt)}</time></td>
@@ -1486,11 +1664,19 @@
             <button class="dashboard-primary" type="button" onclick={() => (showVendorForm = true)}>+ Add vendor</button>
           </header>
 
-          <div class="vendor-summary"><span><strong>{(data.vendors ?? []).length}</strong> vendors</span><span><strong>{(data.vendors ?? []).filter((vendor) => ['booked', 'paid'].includes(vendor.status)).length}</strong> booked</span><span><strong>€{(data.vendors ?? []).reduce((total, vendor) => total + (Number(vendor.cost) || 0), 0).toLocaleString()}</strong> estimated total</span>{#if visibleSelectedVendorIds.length > 0}<div class="summary-bulk-actions" role="toolbar" aria-label="Selected vendor actions"><span>{visibleSelectedVendorIds.length} selected</span><button type="button" class="bulk-delete-button" aria-label="Delete selected vendors" title="Delete selected" onclick={() => requestBulkDelete('vendors')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div>
+          <div class="table-topbar"><div class="table-topbar-left"><label class="table-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={vendorSearch} placeholder="Search vendors" aria-label="Search vendors" /><span>{filteredVendors.length}</span></label>{#if visibleSelectedVendorIds.length > 0}<div class="table-selected-actions"><span>{visibleSelectedVendorIds.length} selected</span><button type="button" class="bulk-delete-button" aria-label="Delete selected vendors" title="Delete selected" onclick={() => requestBulkDelete('vendors')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div><div class="table-topbar-right"><div class="table-filter-chips" role="group" aria-label="Vendor status and budget"><button class:active={vendorFilter === 'all'} type="button" onclick={() => (vendorFilter = 'all')}>All <strong>{(data.vendors ?? []).length}</strong></button><button class:active={vendorFilter === 'booked'} type="button" onclick={() => (vendorFilter = 'booked')}>Booked <strong>{(data.vendors ?? []).filter((vendor) => ['booked', 'paid'].includes(vendor.status)).length}</strong></button><button class:active={vendorFilter === 'planning'} type="button" onclick={() => (vendorFilter = 'planning')}>Planning <strong>{(data.vendors ?? []).filter((vendor) => !['booked', 'paid'].includes(vendor.status)).length}</strong></button><span class="table-info-chip">Budget <strong>€{(data.vendors ?? []).reduce((total, vendor) => total + (Number(vendor.cost) || 0), 0).toLocaleString()}</strong></span></div><button class="table-download-button" type="button" onclick={downloadVendorCsv} aria-label="Download vendors CSV" title="Download CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></div>
 
           <div class="dashboard-table-wrap">
             <table class="dashboard-data-table dashboard-vendor-table">
-              <thead><tr><th><div class="bulk-header-cell"><input class="bulk-select-checkbox" use:setIndeterminate={someVendorsSelected} type="checkbox" checked={allVendorsSelected} onchange={(event) => selectAllVendors(event.currentTarget.checked)} aria-label="Select all vendors" /><span>Vendor</span></div></th><th>Category</th><th>Contact</th><th>Budget</th><th>Status</th><th>Notes</th><th><span class="sr-only">Actions</span></th></tr></thead>
+              <thead><tr>
+                <th aria-sort={vendorSort.key === 'name' ? (vendorSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><div class="bulk-header-cell"><input class="bulk-select-checkbox" use:setIndeterminate={someVendorsSelected} type="checkbox" checked={allVendorsSelected} onchange={(event) => selectAllVendors(event.currentTarget.checked)} aria-label="Select all vendors" /><button class="guest-sort-button" class:sorted={vendorSort.key === 'name'} type="button" onclick={() => toggleTableSort('vendors', 'name')}>Vendor <span aria-hidden="true">{sortArrow(vendorSort, 'name')}</span></button></div></th>
+                <th aria-sort={vendorSort.key === 'category' ? (vendorSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={vendorSort.key === 'category'} type="button" onclick={() => toggleTableSort('vendors', 'category')}>Category <span aria-hidden="true">{sortArrow(vendorSort, 'category')}</span></button></th>
+                <th aria-sort={vendorSort.key === 'contact' ? (vendorSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={vendorSort.key === 'contact'} type="button" onclick={() => toggleTableSort('vendors', 'contact')}>Contact <span aria-hidden="true">{sortArrow(vendorSort, 'contact')}</span></button></th>
+                <th aria-sort={vendorSort.key === 'cost' ? (vendorSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={vendorSort.key === 'cost'} type="button" onclick={() => toggleTableSort('vendors', 'cost')}>Budget <span aria-hidden="true">{sortArrow(vendorSort, 'cost')}</span></button></th>
+                <th aria-sort={vendorSort.key === 'status' ? (vendorSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={vendorSort.key === 'status'} type="button" onclick={() => toggleTableSort('vendors', 'status')}>Status <span aria-hidden="true">{sortArrow(vendorSort, 'status')}</span></button></th>
+                <th aria-sort={vendorSort.key === 'note' ? (vendorSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={vendorSort.key === 'note'} type="button" onclick={() => toggleTableSort('vendors', 'note')}>Notes <span aria-hidden="true">{sortArrow(vendorSort, 'note')}</span></button></th>
+                <th><span class="sr-only">Actions</span></th>
+              </tr></thead>
               <tbody>
                 {#if showVendorForm}
                   <tr class="vendor-form-row"><td colspan="7">
@@ -1509,9 +1695,9 @@
                     </form>
                   </td></tr>
                 {/if}
-                {#each data.vendors ?? [] as vendor (vendor.id)}
+                {#each sortedVendors as vendor (vendor.id)}
                   <tr>
-                    <td><input class="bulk-select-checkbox" type="checkbox" checked={selectedVendorIds.includes(vendor.id)} onchange={() => toggleVendorSelection(vendor.id)} aria-label={`Select ${vendor.name}`} /><span class="vendor-name"><strong>{vendor.name}</strong>{#if vendor.website}<a href={vendorWebsiteHref(vendor.website)} target="_blank" rel="noreferrer">{vendor.website}</a>{/if}</span></td>
+                    <td><div class="vendor-name-cell"><input class="bulk-select-checkbox" type="checkbox" checked={selectedVendorIds.includes(vendor.id)} onchange={() => toggleVendorSelection(vendor.id)} aria-label={`Select ${vendor.name}`} /><span class="vendor-name"><strong>{vendor.name}</strong>{#if vendor.website}<a href={vendorWebsiteHref(vendor.website)} target="_blank" rel="noreferrer">{vendor.website}</a>{/if}</span></div></td>
                     <td><span class="vendor-category">{vendor.category}</span></td>
                     <td><span class="vendor-contact"><strong>{vendor.contact || 'No contact name'}</strong>{#if vendor.email}<a href={`mailto:${vendor.email}`}>{vendor.email}</a>{/if}{#if vendor.phone}<a href={`tel:${vendor.phone}`}>{vendor.phone}</a>{/if}</span></td>
                     <td><span class="vendor-budget"><strong>{vendor.cost ? `€${Number(vendor.cost).toLocaleString()}` : 'Not set'}</strong><small>{vendor.deposit ? `€${Number(vendor.deposit).toLocaleString()} deposit` : 'No deposit recorded'}</small></span></td>
@@ -1530,45 +1716,71 @@
       {:else if active === 'notes'}
         <section class="dashboard-view notes-view" aria-labelledby="notes-heading">
           <header class="dashboard-page-heading notes-heading">
-            <div><h1 id="notes-heading">Notes</h1><p>Collect ideas, lists and visual references in one flexible space.</p></div>
-            <div class="notes-add-actions">
-              <button class="dashboard-secondary" type="button" onclick={() => addNoteCard('checklist')}>+ Checklist</button>
-              <button class="dashboard-primary" type="button" onclick={() => addNoteCard('note')}>+ Note card</button>
-              <label class="dashboard-secondary notes-image-upload">+ Image<input type="file" accept="image/*" multiple onchange={uploadNoteImages} /></label>
-            </div>
+            <div><h1 id="notes-heading">Notes and Calendar</h1></div>
           </header>
 
-          <div class="notes-format-toolbar" role="toolbar" aria-label="Note formatting">
-            <button type="button" aria-label="Bold" title="Bold" disabled={!activeNoteId} onpointerdown={(event) => event.preventDefault()} onclick={() => formatActiveNote('bold')}><strong>B</strong></button>
-            <button type="button" aria-label="Italic" title="Italic" disabled={!activeNoteId} onpointerdown={(event) => event.preventDefault()} onclick={() => formatActiveNote('italic')}><em>I</em></button>
-            <button type="button" aria-label="Underline" title="Underline" disabled={!activeNoteId} onpointerdown={(event) => event.preventDefault()} onclick={() => formatActiveNote('underline')}><u>U</u></button>
-            <button type="button" aria-label="Insert checklist item" title="Insert checklist item" disabled={!activeNoteId} onpointerdown={(event) => event.preventDefault()} onclick={() => formatActiveNote('insertHTML', '<label class="notes-check-row"><input type="checkbox"><span>Checklist item</span></label>')}>☑</button>
-            <span aria-hidden="true"></span>
-            <label class:disabled={!activeNoteId} aria-label="Text colour" title="Text colour"><i aria-hidden="true">A</i><input type="color" value="#76232a" disabled={!activeNoteId} onchange={(event) => formatActiveNote('foreColor', event.currentTarget.value)} /></label>
-            <button type="button" aria-label="Clear formatting" title="Clear formatting" disabled={!activeNoteId} onpointerdown={(event) => event.preventDefault()} onclick={() => formatActiveNote('removeFormat')}>Tx</button>
-          </div>
-
-          <div class="notes-board" aria-label="Notes board">
-            {#if !(data.notesBoard?.items?.length)}
-              <div class="notes-board-empty"><span>✎</span><strong>Your notes board is empty</strong><p>Add a note, checklist or image to begin.</p></div>
-            {/if}
-            {#each data.notesBoard?.items ?? [] as item (item.id)}
-              {#if item.type === 'card'}
-                <article class:active={activeNoteId === item.id} class="notes-card" style={`--note-x:${item.x}px;--note-y:${item.y}px`} data-notes-item={item.id}>
-                  <header data-notes-drag={item.id}>
-                    <span>{item.kind === 'checklist' ? 'Checklist' : 'Note'}</span>
-                    <button type="button" aria-label="Delete note" title="Delete note" onclick={() => removeNoteItem(item.id)}>×</button>
-                  </header>
-                  <div class="notes-card-editor" contenteditable="true" role="textbox" tabindex="0" aria-multiline="true" aria-label={item.kind === 'checklist' ? 'Checklist content' : 'Note content'} data-note-editor={item.id} use:noteContent={item.html} onfocus={() => (activeNoteId = item.id)} onmouseup={() => saveNoteSelection(item.id)} onkeyup={() => saveNoteSelection(item.id)} oninput={(event) => updateNoteEditor(item.id, event.currentTarget)} onchange={(event) => updateNoteEditor(item.id, event.currentTarget)}></div>
-                </article>
-              {:else if item.type === 'image'}
-                <figure class="notes-image" class:dragging={notesGesture?.id === item.id} style={`--note-x:${item.x}px;--note-y:${item.y}px`} data-notes-item={item.id} data-notes-drag={item.id}>
-                  <img src={item.src} alt={item.alt || 'Note reference'} draggable="false" />
-                  <button type="button" aria-label="Delete image" title="Delete image" onclick={() => removeNoteItem(item.id)}>×</button>
-                  <figcaption>{item.alt || 'Reference image'}</figcaption>
-                </figure>
+          <div class="notes-calendar-layout">
+            <section class="notes-calendar-panel" aria-labelledby="calendar-panel-heading">
+              <header class="notes-section-header">
+                <h2 id="calendar-panel-heading">Calendar</h2>
+                <button class="notes-collapse-button" type="button" aria-expanded={!notesSectionsCollapsed.calendar} aria-label={notesSectionsCollapsed.calendar ? 'Expand calendar' : 'Minimize calendar'} onclick={() => toggleNotesSection('calendar')}>{notesSectionsCollapsed.calendar ? '+' : '−'}</button>
+              </header>
+              {#if !notesSectionsCollapsed.calendar}
+                <div class="notes-calendar-toolbar">
+                  <button class="notes-calendar-nav" type="button" aria-label="Previous month" onclick={() => changeCalendarMonth(-1)}>‹</button>
+                  <h3>{calendarMonthLabel}</h3>
+                  <button class="notes-calendar-nav" type="button" aria-label="Next month" onclick={() => changeCalendarMonth(1)}>›</button>
+                  <button class="notes-today-button" type="button" onclick={goToToday}>Today</button>
+                </div>
+                <div class="notes-calendar-grid" role="grid" aria-label={calendarMonthLabel}>
+                  {#each ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as weekday}
+                    <span class="notes-calendar-weekday" role="columnheader">{weekday}</span>
+                  {/each}
+                  {#each calendarDays as day (day.key)}
+                    {@const eventCount = (data.notesCalendar?.events ?? []).filter((event) => event.date === day.key).length}
+                    <button class:outside-month={!day.inMonth} class:selected-day={selectedDayKey === day.key} class:has-events={eventCount > 0} class="notes-calendar-day" type="button" role="gridcell" aria-pressed={selectedDayKey === day.key} aria-label={`${day.date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}${eventCount ? `, ${eventCount} events` : ''}`} onclick={() => { selectedDayKey = day.key; calendarEventFormOpen = false }}>
+                      <span>{day.date.getDate()}</span>
+                      {#if eventCount > 0}<i aria-hidden="true"></i>{/if}
+                    </button>
+                  {/each}
+                </div>
               {/if}
-            {/each}
+            </section>
+
+            <section class="notes-content-panel" aria-labelledby="day-notes-heading">
+              <header class="notes-section-header">
+                <div><p class="dashboard-eyebrow">Selected day</p><h2 id="day-notes-heading">{new Date(`${selectedDayKey}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</h2></div>
+                <button class="notes-collapse-button" type="button" aria-expanded={!notesSectionsCollapsed.day} aria-label={notesSectionsCollapsed.day ? 'Expand selected-day notes' : 'Minimize selected-day notes'} onclick={() => toggleNotesSection('day')}>{notesSectionsCollapsed.day ? '+' : '−'}</button>
+              </header>
+              {#if !notesSectionsCollapsed.day}
+                <div class="notes-day-events">
+                  <div class="notes-subsection-heading"><h3>Events</h3><button class="dashboard-secondary" type="button" onclick={() => (calendarEventFormOpen = !calendarEventFormOpen)}>{calendarEventFormOpen ? 'Cancel' : '+ Add event'}</button></div>
+                  {#if calendarEventFormOpen}
+                    <form class="calendar-event-form" onsubmit={addCalendarEvent}>
+                      <label><span>Event</span><input bind:value={calendarEventForm.title} required maxlength="120" placeholder="Event title" /></label>
+                      <label><span>Time</span><input bind:value={calendarEventForm.time} type="time" aria-label="Event time (optional)" /></label>
+                      <button class="dashboard-primary" type="submit">Add</button>
+                    </form>
+                  {/if}
+                  {#if selectedDayEvents.length}
+                    <ul class="calendar-event-list">{#each selectedDayEvents as event (event.id)}<li><time>{event.time || 'All day'}</time><span>{event.title}</span><button type="button" aria-label={`Remove ${event.title}`} onclick={() => removeCalendarEvent(event.id)}>×</button></li>{/each}</ul>
+                  {:else if !calendarEventFormOpen}
+                    <p class="notes-empty-hint">No events for this day.</p>
+                  {/if}
+                </div>
+                <label class="notes-textarea-label" for="selected-day-notes"><span>Notes for this day</span><textarea id="selected-day-notes" value={data.notesCalendar?.dailyNotes?.[selectedDayKey] ?? ''} oninput={(event) => updateSelectedDayNotes(event.currentTarget.value)} placeholder="Add notes for this date…"></textarea></label>
+              {/if}
+            </section>
+
+            <section class="notes-content-panel notes-fixed-panel" aria-labelledby="fixed-notes-heading">
+              <header class="notes-section-header">
+                <div><p class="dashboard-eyebrow">Always available</p><h2 id="fixed-notes-heading">Fixed notes</h2></div>
+                <button class="notes-collapse-button" type="button" aria-expanded={!notesSectionsCollapsed.fixed} aria-label={notesSectionsCollapsed.fixed ? 'Expand fixed notes' : 'Minimize fixed notes'} onclick={() => toggleNotesSection('fixed')}>{notesSectionsCollapsed.fixed ? '+' : '−'}</button>
+              </header>
+              {#if !notesSectionsCollapsed.fixed}
+                <label class="notes-textarea-label" for="fixed-notes"><span>Notes that stay here</span><textarea id="fixed-notes" value={data.notesCalendar?.fixedNotes ?? ''} oninput={(event) => updateFixedNotes(event.currentTarget.value)} placeholder="Keep important notes here…"></textarea></label>
+              {/if}
+            </section>
           </div>
         </section>
 
@@ -1629,6 +1841,32 @@
     onConfirm={confirmBulkDelete}
     onCancel={() => (bulkDeleteRequest = null)}
   />
+{/if}
+
+{#if openSeatPicker}
+  <div class="dashboard-modal-backdrop" role="presentation" onclick={(event) => event.target === event.currentTarget && (openSeatPicker = null)}>
+    <div class="dashboard-modal seat-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="seat-picker-heading">
+      <button class="dashboard-modal-close" type="button" onclick={() => (openSeatPicker = null)} aria-label="Close guest picker">×</button>
+      <span>{openSeatPicker.tableName} · Chair {openSeatPicker.seatIndex + 1}</span>
+      <h2 id="seat-picker-heading">Choose a guest</h2>
+      <p>Select an unassigned attending guest to add them to this table.</p>
+      <label class="seat-picker-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={seatGuestSearch} type="search" placeholder="Search unassigned guests" aria-label="Search unassigned attending guests" /><span>{data.guests.filter((guest) => guest.status === 'attending' && !guest.tableId && `${guest.name} ${guest.email} ${guest.phone}`.toLowerCase().includes(seatGuestSearch.toLowerCase())).length}</span></label>
+      {#if openSeatPicker.guest}
+        <button class="seat-picker-clear" type="button" onclick={clearSelectedSeat}><span aria-hidden="true">×</span><span><strong>Leave chair empty</strong><small>Unassign {openSeatPicker.guest.name} from this table</small></span></button>
+      {/if}
+      <div class="seat-picker-list">
+        {#each data.guests.filter((guest) => guest.status === 'attending' && !guest.tableId && `${guest.name} ${guest.email} ${guest.phone}`.toLowerCase().includes(seatGuestSearch.toLowerCase())) as guest (guest.id)}
+          <button class:current={guest.id === openSeatPicker.guest?.id} type="button" onclick={() => assignGuestFromSeatPicker(guest)}>
+            <i class={avatarTone(guest.id || guest.name)}>{guest.name.slice(0, 1)}</i>
+            <span><strong>{guest.name}</strong><small>Unassigned</small></span>
+            <b>{guest.party} {guest.party === 1 ? 'seat' : 'seats'}</b>
+          </button>
+        {:else}
+          <p class="seat-picker-empty">{seatGuestSearch ? 'No unassigned guests match your search.' : 'No unassigned attending guests are available.'}</p>
+        {/each}
+      </div>
+    </div>
+  </div>
 {/if}
 
 {#if showTableForm}

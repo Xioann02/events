@@ -50,6 +50,7 @@
         dashboardData = {
           ...savedDashboard,
           guests,
+          songs: Array.isArray(savedDashboard.songs) ? savedDashboard.songs : [],
           messages: Array.isArray(savedDashboard.messages) ? savedDashboard.messages : [createSampleMessage(guests[0])],
           vendors: savedDashboard.vendorExampleAdded
             ? (savedDashboard.vendors ?? [])

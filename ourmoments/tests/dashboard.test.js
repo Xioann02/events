@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createDashboardData, createGift, createGuest, createTable, dashboardSummary } from '../src/lib/dashboard-data.js'
+import { createDashboardData, createGift, createGuest, createSong, createTable, dashboardSummary } from '../src/lib/dashboard-data.js'
 
 test('dashboard seed data is tied to the purchased website', () => {
   const data = createDashboardData({ title: 'Clara & Theo' })
@@ -10,6 +10,7 @@ test('dashboard seed data is tied to the purchased website', () => {
   assert.ok(data.guests.length > 0)
   assert.ok(data.tables.length > 0)
   assert.deepEqual(data.floorPlan, { shapes: [], tableShape: 'round' })
+  assert.deepEqual(data.songs, [])
 })
 
 test('guest and RSVP summary uses party size', () => {
@@ -30,4 +31,8 @@ test('dashboard creators normalise form values', () => {
   const moneyGift = createGift({ guest: 'Maya', type: 'money', amount: '150', currency: 'EUR', gift: '', note: '' })
   assert.equal(moneyGift.amount, '150')
   assert.equal(moneyGift.gift, '')
+  assert.deepEqual(
+    (({ name, link, type }) => ({ name, link, type }))(createSong({ name: '  At Last  ', link: '  https://example.com/song  ', type: 'first-dance' })),
+    { name: 'At Last', link: 'https://example.com/song', type: 'first-dance' },
+  )
 })
