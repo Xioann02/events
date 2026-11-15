@@ -175,15 +175,20 @@ p {
   gap: 34px;
 }
 
-.desktop-nav a {
+.desktop-nav a,
+.desktop-nav button {
   position: relative;
+  padding: 0;
+  border: 0;
   color: #514a44;
+  background: transparent;
   font-size: max(13px, 0.76rem);
   font-weight: 600;
   text-decoration: none;
 }
 
-.desktop-nav a::after {
+.desktop-nav a::after,
+.desktop-nav button::after {
   position: absolute;
   right: 0;
   bottom: -7px;
@@ -196,7 +201,8 @@ p {
   transition: transform 220ms var(--ease);
 }
 
-.desktop-nav a:hover::after {
+.desktop-nav a:hover::after,
+.desktop-nav button:hover::after {
   transform: scaleX(1);
   transform-origin: left;
 }
@@ -1049,6 +1055,43 @@ p {
 
 .footer-links a:hover,
 .footer-links button:hover { color: #fff; }
+
+.demo-modal-backdrop {
+  position: fixed;
+  z-index: 1200;
+  inset: 0;
+  display: grid;
+  padding: 24px;
+  background: rgba(26, 23, 20, .72);
+  backdrop-filter: blur(10px);
+  place-items: center;
+  animation: backdrop-in 180ms ease both;
+}
+
+.demo-modal {
+  width: min(1000px, 100%);
+  overflow: hidden;
+  border-radius: 20px;
+  outline: 0;
+  background: var(--paper);
+  box-shadow: 0 40px 120px rgba(22, 17, 14, .45);
+  animation: modal-in 300ms var(--ease) both;
+}
+
+.demo-modal > header { display: flex; min-height: 112px; padding: 25px 28px; align-items: center; justify-content: space-between; gap: 24px; }
+.demo-modal > header h2 { margin-top: 7px; font-family: var(--display); font-size: clamp(1.8rem,4vw,3rem); font-weight: 400; letter-spacing: -.035em; }
+.demo-modal > header > button { display: grid; width: 40px; min-width: 40px; height: 40px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: transparent; place-items: center; font-size: 24px; line-height: 1; }
+.demo-modal > header > button:hover { background: var(--paper-deep); }
+.demo-video-tabs { display: flex; padding: 0 28px 14px; background: var(--paper); gap: 7px; }
+.demo-video-tabs button { min-height: 40px; padding: 0 15px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); background: transparent; font-size: 13px; font-weight: 700; }
+.demo-video-tabs button:hover { color: var(--ink); background: var(--paper-deep); }
+.demo-video-tabs button.active { color: #fff; border-color: var(--ink); background: var(--ink); }
+.demo-video-frame { aspect-ratio: 16/9; background: #171614; }
+.demo-video-frame video { width: 100%; height: 100%; object-fit: contain; }
+.demo-video-placeholder { display: grid; width: 100%; height: 100%; padding: 30px; color: rgba(255,255,255,.75); place-content: center; justify-items: center; gap: 9px; text-align: center; }
+.demo-video-placeholder > span { display: grid; width: 74px; height: 74px; padding-left: 5px; margin-bottom: 8px; border: 1px solid rgba(255,255,255,.28); border-radius: 50%; color: #fff; background: rgba(255,255,255,.08); place-items: center; font-size: 25px; }
+.demo-video-placeholder strong { color: #fff; font-family: var(--display); font-size: clamp(1.6rem,4vw,2.5rem); font-weight: 400; }
+.demo-video-placeholder small { color: rgba(255,255,255,.55); font-size: 12px; }
 
 .contact-modal-backdrop {
   position: fixed;
@@ -2499,6 +2542,14 @@ p {
 }
 
 @media (max-width: 760px) {
+  .demo-modal-backdrop { padding: 12px; }
+  .demo-modal { border-radius: 16px; }
+  .demo-modal > header { min-height: 92px; padding: 20px; }
+  .demo-modal > header .overline { display: none; }
+  .demo-video-tabs { padding: 0 20px 12px; }
+  .demo-video-tabs button { min-height: 36px; padding-inline: 12px; }
+  .demo-video-placeholder > span { width: 58px; height: 58px; font-size: 20px; }
+
   .contact-modal-backdrop { padding: 12px; }
   .contact-modal { max-height: calc(100vh - 24px); padding: 38px 22px 26px; border-radius: 16px; }
 
