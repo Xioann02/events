@@ -43,7 +43,7 @@ export function createDashboardData(site) {
     vendorExampleAdded: true,
     messages: [
       createSampleMessage(guests[0]),
-      { id: id('message'), guestId: guestId('Marcus Cole'), name: 'Marcus Cole', email: 'marcus@example.com', phone: '+357 96 234567', message: 'Thank you for the invitation. Looking forward to the big day!', sentAt: new Date(Date.now() - 1000 * 60 * 60 * 26).toISOString(), read: true },
+      { id: id('message'), guestId: guestId('Marcus Cole'), name: 'Marcus Cole', email: 'marcus@example.com', phone: '+357 96 234567', message: 'Thank you for the invitation. Looking forward to the big day!', sentAt: new Date(Date.now() - 1000 * 60 * 60 * 26).toISOString(), direction: 'received', channel: 'website', read: true },
     ],
     guests,
     gifts: [
@@ -73,6 +73,8 @@ export function createSampleMessage(guest = {}) {
     phone: guest.phone || '+357 99 123456',
     message: 'We are so excited to celebrate with you. Everything looks beautiful!',
     sentAt: new Date(Date.now() - 1000 * 60 * 42).toISOString(),
+    direction: 'received',
+    channel: 'website',
     read: false,
   }
 }

@@ -11,18 +11,26 @@
 
   let { account, site, data = $bindable(), onHome, onEditWebsite, onNotify } = $props()
 
-  const navItems = [
-    { id: 'overview', label: 'Overview', glyph: '⌂' },
-    { id: 'guests', label: 'Guest list', glyph: '◎' },
-    { id: 'seating', label: 'Table seating', glyph: '⊞' },
-    { id: 'photos', label: 'Photos', glyph: '▧' },
-    { id: 'gifts', label: 'Gifts', glyph: '◇' },
-    { id: 'music', label: 'Music', glyph: '♪' },
-    { id: 'vendors', label: 'Vendors', glyph: '▤' },
-    { id: 'messages', label: 'Messages', glyph: '✉' },
-    { id: 'notes', label: 'Notes', glyph: '✎' },
-    { id: 'website', label: 'Website', glyph: '↗' },
-    { id: 'qr', label: 'QR code', glyph: '⌗' },
+  const navGroups = [
+    { label: 'Home', items: [
+      { id: 'overview', label: 'Overview', glyph: '⌂' },
+    ] },
+    { label: 'Guests', items: [
+      { id: 'guests', label: 'Guest list', glyph: '◎' },
+      { id: 'seating', label: 'Table seating', glyph: '⊞' },
+      { id: 'messages', label: 'Messages', glyph: '✉' },
+    ] },
+    { label: 'Planning', items: [
+      { id: 'notes', label: 'Calendar and Notes', glyph: '✎' },
+      { id: 'vendors', label: 'Vendors', glyph: '▤' },
+      { id: 'gifts', label: 'Gifts', glyph: '◇' },
+      { id: 'music', label: 'Music', glyph: '♪' },
+      { id: 'photos', label: 'Photos', glyph: '▧' },
+    ] },
+    { label: 'Website and sharing', items: [
+      { id: 'website', label: 'Website', glyph: '↗' },
+      { id: 'qr', label: 'QR code', glyph: '⌗' },
+    ] },
   ]
 
   const photoAssets = { couple: couplePhoto, table: tablePhoto, 'still-life': stillLifePhoto }
@@ -346,6 +354,17 @@
       : selectedGiftIds.filter((id) => !filteredGifts.some((gift) => gift.id === id))
   }
 
+  function updateSelectedGiftStatus(status) {
+    const selectedIds = new Set(visibleSelectedGiftIds)
+    if (!selectedIds.size) return
+    const thanked = status === 'thanked'
+    data = {
+      ...data,
+      gifts: data.gifts.map((gift) => selectedIds.has(gift.id) ? { ...gift, thanked } : gift),
+    }
+    onNotify(`Marked ${selectedIds.size} selected ${selectedIds.size === 1 ? 'gift' : 'gifts'} as ${thanked ? 'thanked' : 'pending'}.`)
+  }
+
   function toggleSongSelection(songId) {
     selectedSongIds = selectedSongIds.includes(songId)
       ? selectedSongIds.filter((id) => id !== songId)
@@ -380,6 +399,17 @@
     selectedVendorIds = checked
       ? [...new Set([...selectedVendorIds, ...filteredVendors.map((vendor) => vendor.id)])]
       : selectedVendorIds.filter((id) => !filteredVendors.some((vendor) => vendor.id === id))
+  }
+
+  function updateSelectedVendorStatus(status) {
+    const selectedIds = new Set(visibleSelectedVendorIds)
+    if (!selectedIds.size) return
+    data = {
+      ...data,
+      vendors: (data.vendors ?? []).map((vendor) => selectedIds.has(vendor.id) ? { ...vendor, status } : vendor),
+    }
+    const label = status === 'quoted' ? 'quote received' : status
+    onNotify(`Updated ${selectedIds.size} selected ${selectedIds.size === 1 ? 'vendor' : 'vendors'} to ${label}.`)
   }
 
   function requestBulkDelete(type) {
@@ -1373,6 +1403,71 @@
     selectedDayKey = formatCalendarDate(today)
   }
 
+  function escapeCalendarText(value = '') {
+    return String(value)
+      .replaceAll('\\', '\\\\')
+      .replaceAll(';', '\\;')
+      .replaceAll(',', '\\,')
+      .replaceAll(/\r?\n/g, '\\n')
+  }
+
+  function compactCalendarDate(value) {
+    return String(value).replaceAll('-', '')
+  }
+
+  function nextCalendarDate(value) {
+    const [year, month, day] = value.split('-').map(Number)
+    return formatCalendarDate(new Date(year, month - 1, day + 1))
+  }
+
+  function exportCalendar() {
+    const notes = notesCalendarData()
+    const events = notes.events ?? []
+    if (!events.length) {
+      onNotify('Add at least one calendar event before exporting.')
+      return
+    }
+
+    const stamp = new Date().toISOString().replaceAll('-', '').replaceAll(':', '').replace(/\.\d{3}Z$/, 'Z')
+    const eventBlocks = events.map((calendarEvent) => {
+      const date = compactCalendarDate(calendarEvent.date)
+      const description = notes.dailyNotes?.[calendarEvent.date]?.trim()
+      const timing = calendarEvent.time
+        ? `DTSTART:${date}T${calendarEvent.time.replace(':', '')}00\r\nDURATION:PT1H`
+        : `DTSTART;VALUE=DATE:${date}\r\nDTEND;VALUE=DATE:${compactCalendarDate(nextCalendarDate(calendarEvent.date))}`
+      return [
+        'BEGIN:VEVENT',
+        `UID:${escapeCalendarText(calendarEvent.id)}@ourmoments.io`,
+        `DTSTAMP:${stamp}`,
+        timing,
+        `SUMMARY:${escapeCalendarText(calendarEvent.title)}`,
+        description ? `DESCRIPTION:${escapeCalendarText(description)}` : '',
+        'END:VEVENT',
+      ].filter(Boolean).join('\r\n')
+    })
+    const calendar = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'PRODID:-//ourmoments.io//Planning Calendar//EN',
+      `X-WR-CALNAME:${escapeCalendarText(`${data.eventName} planning`)}`,
+      ...eventBlocks,
+      'END:VCALENDAR',
+      '',
+    ].join('\r\n')
+    const blob = new Blob([calendar], { type: 'text/calendar;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${data.eventName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'ourmoments'}-calendar.ics`
+    document.body.append(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    onNotify(`Exported ${events.length} calendar ${events.length === 1 ? 'event' : 'events'}.`)
+  }
+
   function toggleNotesSection(section) {
     notesSectionsCollapsed = { ...notesSectionsCollapsed, [section]: !notesSectionsCollapsed[section] }
   }
@@ -1784,13 +1879,16 @@
     </div>
 
     <nav class="dashboard-nav" aria-label="Dashboard navigation">
-      <span>Manage</span>
-      {#each navItems as item}
-        <button class:active={active === item.id} type="button" onclick={() => navigate(item.id)}>
-          <i aria-hidden="true">{item.glyph}</i>
-          <span>{item.label}</span>
-          {#if item.id === 'guests' && summary.pending > 0}<b>{summary.pending}</b>{/if}
-        </button>
+      {#each navGroups as group}
+        <div class="dashboard-nav-group" role="group" aria-label={group.label}>
+          {#each group.items as item}
+            <button class:active={active === item.id} type="button" onclick={() => navigate(item.id)}>
+              <i aria-hidden="true">{item.glyph}</i>
+              <span>{item.label}</span>
+              {#if item.id === 'guests' && summary.pending > 0}<b>{summary.pending}</b>{/if}
+            </button>
+          {/each}
+        </div>
       {/each}
     </nav>
 
@@ -1823,7 +1921,7 @@
         <section class="dashboard-view dashboard-overview" aria-labelledby="dashboard-heading">
           <header class="dashboard-page-heading dashboard-page-heading--overview">
             <div>
-              <p class="dashboard-eyebrow">Welcome back, {account.firstName}✨</p>
+              <p class="dashboard-eyebrow">Welcome back, {account.firstName}🤍</p>
               <h1 id="dashboard-heading">Your celebration,<br /><em>beautifully organised.</em></h1>
             </div>
           </header>
@@ -2064,7 +2162,7 @@
       {:else if active === 'gifts'}
         <section class="dashboard-view" aria-labelledby="gifts-heading">
           <header class="dashboard-page-heading"><div><h1 id="gifts-heading">Gift list</h1><p>Track monetary gifts and meaningful items, linked directly to your guests.</p></div><button class="dashboard-primary" type="button" onclick={() => openGiftForm()}>+ Add gift</button></header>
-          <div class="table-topbar"><div class="table-topbar-left"><label class="table-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={giftSearch} placeholder="Search gifts" aria-label="Search gifts" /><span>{filteredGifts.length}</span></label>{#if visibleSelectedGiftIds.length > 0}<div class="table-selected-actions"><span>{visibleSelectedGiftIds.length} selected</span><button type="button" class="bulk-delete-button" aria-label="Delete selected gifts" title="Delete selected" onclick={() => requestBulkDelete('gifts')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div><div class="table-topbar-right"><div class="table-filter-chips" role="group" aria-label="Filter gifts"><button class:active={giftFilter === 'all'} type="button" onclick={() => (giftFilter = 'all')}>All <strong>{data.gifts.length}</strong></button><button class:active={giftFilter === 'thanked'} type="button" onclick={() => (giftFilter = 'thanked')}>Thanked <strong>{data.gifts.filter((gift) => gift.thanked).length}</strong></button><button class:active={giftFilter === 'pending'} type="button" onclick={() => (giftFilter = 'pending')}>Pending <strong>{data.gifts.filter((gift) => !gift.thanked).length}</strong></button></div><button class="table-download-button" type="button" onclick={downloadGiftCsv} aria-label="Download gift list CSV" title="Download to CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></div>
+          <div class="table-topbar"><div class="table-topbar-left"><label class="table-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={giftSearch} placeholder="Search gifts" aria-label="Search gifts" /><span>{filteredGifts.length}</span></label>{#if visibleSelectedGiftIds.length > 0}<div class="table-selected-actions"><span>{visibleSelectedGiftIds.length} selected</span><label class="bulk-rsvp-control"><select aria-label="Change thank-you status for selected gifts" onchange={(event) => updateSelectedGiftStatus(event.currentTarget.value)}><option value="" selected disabled>Status</option><option value="thanked">Thanked</option><option value="pending">Pending</option></select></label><button type="button" class="bulk-delete-button" aria-label="Delete selected gifts" title="Delete selected" onclick={() => requestBulkDelete('gifts')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div><div class="table-topbar-right"><div class="table-filter-chips" role="group" aria-label="Filter gifts"><button class:active={giftFilter === 'all'} type="button" onclick={() => (giftFilter = 'all')}>All <strong>{data.gifts.length}</strong></button><button class:active={giftFilter === 'thanked'} type="button" onclick={() => (giftFilter = 'thanked')}>Thanked <strong>{data.gifts.filter((gift) => gift.thanked).length}</strong></button><button class:active={giftFilter === 'pending'} type="button" onclick={() => (giftFilter = 'pending')}>Pending <strong>{data.gifts.filter((gift) => !gift.thanked).length}</strong></button></div><button class="table-download-button" type="button" onclick={downloadGiftCsv} aria-label="Download gift list CSV" title="Download to CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></div>
           <div class="dashboard-table-wrap" role="region" aria-label="Gift list table">
             <table class="dashboard-data-table dashboard-gift-table">
               <thead><tr>
@@ -2155,7 +2253,7 @@
             <button class="dashboard-primary" type="button" onclick={openVendorForm}>+ Add vendor</button>
           </header>
 
-          <div class="table-topbar"><div class="table-topbar-left"><label class="table-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={vendorSearch} placeholder="Search vendors" aria-label="Search vendors" /><span>{filteredVendors.length}</span></label>{#if visibleSelectedVendorIds.length > 0}<div class="table-selected-actions"><span>{visibleSelectedVendorIds.length} selected</span><button type="button" class="bulk-delete-button" aria-label="Delete selected vendors" title="Delete selected" onclick={() => requestBulkDelete('vendors')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div><div class="table-topbar-right"><div class="table-filter-chips" role="group" aria-label="Vendor status and budget"><button class:active={vendorFilter === 'all'} type="button" onclick={() => (vendorFilter = 'all')}>All <strong>{(data.vendors ?? []).length}</strong></button><button class:active={vendorFilter === 'booked'} type="button" onclick={() => (vendorFilter = 'booked')}>Booked <strong>{(data.vendors ?? []).filter((vendor) => ['booked', 'paid'].includes(vendor.status)).length}</strong></button><button class:active={vendorFilter === 'planning'} type="button" onclick={() => (vendorFilter = 'planning')}>Planning <strong>{(data.vendors ?? []).filter((vendor) => !['booked', 'paid'].includes(vendor.status)).length}</strong></button><span class="table-info-chip">Budget <strong>€{(data.vendors ?? []).reduce((total, vendor) => total + (Number(vendor.cost) || 0), 0).toLocaleString()}</strong></span></div><button class="table-download-button" type="button" onclick={downloadVendorCsv} aria-label="Download vendors CSV" title="Download to CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></div>
+          <div class="table-topbar"><div class="table-topbar-left"><label class="table-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={vendorSearch} placeholder="Search vendors" aria-label="Search vendors" /><span>{filteredVendors.length}</span></label>{#if visibleSelectedVendorIds.length > 0}<div class="table-selected-actions"><span>{visibleSelectedVendorIds.length} selected</span><label class="bulk-rsvp-control"><select aria-label="Change status for selected vendors" onchange={(event) => updateSelectedVendorStatus(event.currentTarget.value)}><option value="" selected disabled>Status</option><option value="researching">Researching</option><option value="contacted">Contacted</option><option value="quoted">Quote received</option><option value="booked">Booked</option><option value="paid">Paid</option></select></label><button type="button" class="bulk-delete-button" aria-label="Delete selected vendors" title="Delete selected" onclick={() => requestBulkDelete('vendors')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div><div class="table-topbar-right"><div class="table-filter-chips" role="group" aria-label="Vendor status and budget"><button class:active={vendorFilter === 'all'} type="button" onclick={() => (vendorFilter = 'all')}>All <strong>{(data.vendors ?? []).length}</strong></button><button class:active={vendorFilter === 'booked'} type="button" onclick={() => (vendorFilter = 'booked')}>Booked <strong>{(data.vendors ?? []).filter((vendor) => ['booked', 'paid'].includes(vendor.status)).length}</strong></button><button class:active={vendorFilter === 'planning'} type="button" onclick={() => (vendorFilter = 'planning')}>Planning <strong>{(data.vendors ?? []).filter((vendor) => !['booked', 'paid'].includes(vendor.status)).length}</strong></button><span class="table-info-chip">Budget <strong>€{(data.vendors ?? []).reduce((total, vendor) => total + (Number(vendor.cost) || 0), 0).toLocaleString()}</strong></span></div><button class="table-download-button" type="button" onclick={downloadVendorCsv} aria-label="Download vendors CSV" title="Download to CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></div>
 
           <div class="dashboard-table-wrap" role="region" aria-label="Vendor list table">
             <table class="dashboard-data-table dashboard-vendor-table">
@@ -2190,7 +2288,8 @@
       {:else if active === 'notes'}
         <section class="dashboard-view notes-view" aria-labelledby="notes-heading">
           <header class="dashboard-page-heading notes-heading">
-            <div><h1 id="notes-heading">Notes and Calendar</h1></div>
+            <div><h1 id="notes-heading">Calendar and Notes</h1></div>
+            <button class="dashboard-secondary calendar-export-button" type="button" onclick={exportCalendar}><span aria-hidden="true">↓</span> Export calendar</button>
           </header>
 
           <div class="notes-calendar-layout">
@@ -2262,7 +2361,7 @@
               {#if !notesSectionsCollapsed.fixed}
                 <div class="general-notes-list" role="list">
                   {#each generalNotesData() as note (note.id)}
-                    <article role="listitem" class:editing={activeGeneralNoteId === note.id} class:full-width={note.fullWidth || generalNoteAutoFullWidth(note.id)} class:dragging={draggedGeneralNoteId === note.id} class:drag-over={dragOverGeneralNoteId === note.id && draggedGeneralNoteId !== note.id} class={`general-note-card general-note-card--${note.color || 'yellow'}`} onfocusin={(event) => { if (!event.target.matches?.('input[type="checkbox"], .general-note-drag-handle, .general-note-width-toggle, .general-note-background-picker button')) activeGeneralNoteId = note.id }} ondragover={(event) => { if (draggedGeneralNoteId && draggedGeneralNoteId !== note.id) { event.preventDefault(); dragOverGeneralNoteId = note.id } }} ondrop={(event) => dropGeneralNote(event, note.id)}>
+                    <article role="listitem" class:editing={activeGeneralNoteId === note.id} class:full-width={note.fullWidth || generalNoteAutoFullWidth(note.id)} class:dragging={draggedGeneralNoteId === note.id} class:drag-over={dragOverGeneralNoteId === note.id && draggedGeneralNoteId !== note.id} class={`general-note-card general-note-card--${note.color || 'yellow'}`} onfocusin={(event) => { if (!event.target.matches?.('input[type="checkbox"], .general-note-drag-handle, .general-note-width-toggle, .general-note-remove, .general-note-background-picker button')) activeGeneralNoteId = note.id }} ondragover={(event) => { if (draggedGeneralNoteId && draggedGeneralNoteId !== note.id) { event.preventDefault(); dragOverGeneralNoteId = note.id } }} ondrop={(event) => dropGeneralNote(event, note.id)}>
                       <div class="general-note-topline">
                         {#if activeGeneralNoteId === note.id}
                           <input id={`general-note-title-${note.id}`} class="general-note-title" value={note.title} oninput={(event) => updateGeneralNote(note.id, { title: event.currentTarget.value })} maxlength="100" aria-label="Note title" placeholder="Note title" />
@@ -2278,7 +2377,7 @@
                           {/each}
                         </div>
                         <button class:active={note.fullWidth} class="general-note-width-toggle" type="button" aria-label={note.fullWidth ? `Use half width for ${note.title || 'note'}` : `Make ${note.title || 'note'} full width`} aria-pressed={Boolean(note.fullWidth)} title={note.fullWidth ? 'Use half width' : 'Make full width'} onclick={() => updateGeneralNote(note.id, { fullWidth: !note.fullWidth })}><svg viewBox="0 0 20 20" aria-hidden="true">{#if note.fullWidth}<path d="m7 6-3 4 3 4M13 6l3 4-3 4M4 10h12"></path>{:else}<path d="M8 6 4 10l4 4M12 6l4 4-4 4M4 10h12"></path>{/if}</svg></button>
-                        <button class="general-note-remove" type="button" onclick={() => removeGeneralNote(note.id)} aria-label={`Delete ${note.title || 'note'}`}>×</button>
+                        <button class="general-note-remove" type="button" onmousedown={(event) => event.preventDefault()} onclick={(event) => { event.stopPropagation(); removeGeneralNote(note.id) }} aria-label={`Delete ${note.title || 'note'}`}>×</button>
                       </div>
 
                       {#if activeGeneralNoteId === note.id}<div class="general-note-toolbar" role="group" aria-label="Text formatting">
