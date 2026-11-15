@@ -26,7 +26,9 @@ test('guest and RSVP summary uses party size', () => {
 
 test('dashboard creators normalise form values', () => {
   assert.equal(createTable(4, 1).capacity, 2)
-  assert.equal(createGuest({ name: '  Maya  ', email: ' maya@example.com ', party: 0, status: 'pending' }).name, 'Maya')
+  const invitedGuest = createGuest({ name: '  Maya  ', email: ' maya@example.com ', party: 0, status: 'pending', invitedVia: 'email' })
+  assert.equal(invitedGuest.name, 'Maya')
+  assert.equal(invitedGuest.invitedVia, 'email')
   const { guest, gift, note, thanked } = createGift({ guest: '  Alex ', type: 'item', gift: '  Linen ', note: '  Thank you ' })
   assert.deepEqual({ guest, gift, note, thanked }, { guest: 'Alex', gift: 'Linen', note: 'Thank you', thanked: false })
   const moneyGift = createGift({ guest: 'Maya', type: 'money', amount: '150', currency: 'EUR', gift: '', note: '' })

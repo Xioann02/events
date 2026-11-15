@@ -15,14 +15,14 @@ function slugify(value) {
 export function createDashboardData(site) {
   const title = site?.title || 'Your celebration'
   const guests = [
-    { id: id('guest'), name: 'Elena Marin', email: 'elena@example.com', phone: '+357 99 123456', party: 2, status: 'attending', attended: true, note: 'Travelling with partner.', tableId: 'table-1', meal: 'Vegetarian' },
-    { id: id('guest'), name: 'Marcus Cole', email: 'marcus@example.com', phone: '+357 96 234567', party: 1, status: 'attending', attended: true, note: '', tableId: 'table-1', meal: 'Chicken' },
-    { id: id('guest'), name: 'Amelia Hart', email: 'amelia@example.com', phone: '', party: 2, status: 'pending', attended: null, note: 'Follow up next week.', tableId: '', meal: '' },
-    { id: id('guest'), name: 'Theo James', email: 'theo@example.com', phone: '+357 97 345678', party: 1, status: 'attending', attended: null, note: '', tableId: 'table-2', meal: 'Beef' },
-    { id: id('guest'), name: 'Maya Lewis', email: 'maya@example.com', phone: '', party: 1, status: 'declined', attended: false, note: 'Sending her wishes.', tableId: '', meal: '' },
-    { id: id('guest'), name: 'Noah Bennett', email: 'noah@example.com', phone: '+357 95 456789', party: 2, status: 'attending', attended: null, note: '', tableId: 'table-2', meal: 'Fish' },
-    { id: id('guest'), name: 'Emma Bennett', email: 'emma@example.com', phone: '', party: 1, status: 'pending', attended: null, note: '', tableId: '', meal: '' },
-    { id: id('guest'), name: 'Alex Reed', email: 'alex@example.com', phone: '+357 94 567890', party: 2, status: 'attending', attended: true, note: '', tableId: 'table-3', meal: 'Vegetarian' },
+    { id: id('guest'), name: 'Elena Marin', email: 'elena@example.com', phone: '+357 99 123456', party: 2, status: 'attending', invitedVia: 'whatsapp', attended: true, note: 'Travelling with partner.', tableId: 'table-1', meal: 'Vegetarian' },
+    { id: id('guest'), name: 'Marcus Cole', email: 'marcus@example.com', phone: '+357 96 234567', party: 1, status: 'attending', invitedVia: 'email', attended: true, note: '', tableId: 'table-1', meal: 'Chicken' },
+    { id: id('guest'), name: 'Amelia Hart', email: 'amelia@example.com', phone: '', party: 2, status: 'pending', invitedVia: 'email', attended: null, note: 'Follow up next week.', tableId: '', meal: '' },
+    { id: id('guest'), name: 'Theo James', email: 'theo@example.com', phone: '+357 97 345678', party: 1, status: 'attending', invitedVia: 'sms', attended: null, note: '', tableId: 'table-2', meal: 'Beef' },
+    { id: id('guest'), name: 'Maya Lewis', email: 'maya@example.com', phone: '', party: 1, status: 'declined', invitedVia: 'email', attended: false, note: 'Sending her wishes.', tableId: '', meal: '' },
+    { id: id('guest'), name: 'Noah Bennett', email: 'noah@example.com', phone: '+357 95 456789', party: 2, status: 'attending', invitedVia: 'viber', attended: null, note: '', tableId: 'table-2', meal: 'Fish' },
+    { id: id('guest'), name: 'Emma Bennett', email: 'emma@example.com', phone: '', party: 1, status: 'pending', invitedVia: '', attended: null, note: '', tableId: '', meal: '' },
+    { id: id('guest'), name: 'Alex Reed', email: 'alex@example.com', phone: '+357 94 567890', party: 2, status: 'attending', invitedVia: 'whatsapp', attended: true, note: '', tableId: 'table-3', meal: 'Vegetarian' },
   ]
 
   const guestId = (name) => guests.find((guest) => guest.name === name)?.id ?? ''
@@ -89,6 +89,8 @@ export function createGuest(values) {
     children,
     party: adults + children,
     status: values.status || 'pending',
+    invitedVia: values.invitedVia || '',
+    invitedAt: values.invitedAt || '',
     attended: null,
     note: values.note?.trim() ?? '',
     tableId: '',

@@ -49,7 +49,7 @@
   let selectedSongIds = $state([])
   let selectedMessageIds = $state([])
   let selectedVendorIds = $state([])
-  let openGuestMenuId = $state('')
+  let openRowMenuKey = $state('')
   let editingGuestId = $state('')
   let editingGiftId = $state('')
   let editingSongId = $state('')
@@ -69,7 +69,12 @@
   let seatGuestSearch = $state('')
   let showGiftForm = $state(false)
   let showMusicForm = $state(false)
+  let showMessageForm = $state(false)
   let showVendorForm = $state(false)
+  let shareGuestIds = $state([])
+  let shareMethod = $state('whatsapp')
+  let shareMessage = $state('')
+  let shareResult = $state(null)
   let draggedGuestId = $state('')
   let seatingView = $state('tables')
   let floorTool = $state('select')
@@ -94,9 +99,9 @@
   let guestForm = $state({ name: '', email: '', phone: '', adults: 1, children: 0, status: 'pending', note: '', meal: '' })
   let guestEditForm = $state({ name: '', email: '', phone: '', adults: 1, children: 0, status: 'pending', note: '', meal: '' })
   let tableForm = $state({ capacity: 8 })
-  let giftForm = $state({ guestId: '', guest: '', type: 'money', amount: '', currency: 'EUR', gift: '', note: '' })
+  let giftForm = $state({ guestId: '', guest: '', type: 'money', amount: '', currency: 'EUR', gift: '', note: '', thanked: false })
   let musicForm = $state({ name: '', link: '', type: 'other' })
-  let messageForm = $state({ name: '', email: '', phone: '', message: '', read: false })
+  let messageForm = $state({ name: '', email: '', phone: '', message: '', read: false, sentAt: '' })
   let musicLinkError = $state('')
   let musicMetadataLoading = $state(false)
   let musicSaving = $state(false)
@@ -148,7 +153,7 @@
   let someVendorsSelected = $derived(visibleSelectedVendorIds.length > 0 && !allVendorsSelected)
   let filteredGuests = $derived(
     data.guests.filter((guest) => {
-      const matchesSearch = `${guest.name} ${guest.email}`.toLowerCase().includes(guestSearch.toLowerCase())
+      const matchesSearch = `${guest.name} ${guest.email} ${guest.phone ?? ''} ${shareMethodLabel(guest.invitedVia)} ${guest.invitedVia ? 'invited' : 'not invited'}`.toLowerCase().includes(guestSearch.toLowerCase())
       const matchesStatus = rsvpFilter === 'all' || guest.status === rsvpFilter
       return matchesSearch && matchesStatus
     }),
@@ -234,7 +239,7 @@
   }
 
   function openGuestRow() {
-    openGuestMenuId = ''
+    openRowMenuKey = ''
     editingGuestId = ''
     guestForm = { name: '', email: '', phone: '', adults: 1, children: 0, status: 'pending', note: '', meal: '' }
     showGuestForm = true
@@ -261,7 +266,7 @@
       gifts: data.gifts.map((gift) => (gift.guestId === guestId ? { ...gift, guestId: '' } : gift)),
     }
     selectedGuestIds = selectedGuestIds.filter((id) => id !== guestId)
-    openGuestMenuId = ''
+    openRowMenuKey = ''
     guestToDelete = null
     onNotify('Guest removed.')
   }
@@ -282,6 +287,41 @@
     selectedGuestIds = checked
       ? [...new Set([...selectedGuestIds, ...visibleIds])]
       : selectedGuestIds.filter((id) => !visibleIds.has(id))
+  }
+
+  function openGuestShareModal(guestIds) {
+    const validIds = [...new Set(guestIds)].filter((id) => data.guests.some((guest) => guest.id === id))
+    if (!validIds.length) return
+    shareGuestIds = validIds
+    shareMethod = 'whatsapp'
+    shareMessage = `Hi! We'd love you to join us for ${data.eventName}. You can view all the details and RSVP here:\n${data.siteUrl}`
+    shareResult = null
+    openRowMenuKey = ''
+  }
+
+  function closeGuestShareModal() {
+    shareGuestIds = []
+    shareResult = null
+  }
+
+  function simulateGuestShare(event) {
+    event.preventDefault()
+    const guests = data.guests.filter((guest) => shareGuestIds.includes(guest.id))
+    const usesEmail = shareMethod === 'email'
+    const sent = guests.filter((guest) => usesEmail ? guest.email?.trim() : guest.phone?.trim())
+    const failed = guests.filter((guest) => !sent.includes(guest))
+    const sentIds = new Set(sent.map((guest) => guest.id))
+    const invitedAt = new Date().toISOString()
+    data = {
+      ...data,
+      guests: data.guests.map((guest) => sentIds.has(guest.id) ? { ...guest, invitedVia: shareMethod, invitedAt } : guest),
+    }
+    shareResult = { sent, failed, method: shareMethod }
+    onNotify(`Recorded ${sent.length} ${sent.length === 1 ? 'invitation' : 'invitations'} via ${shareMethodLabel(shareMethod)}${failed.length ? `; ${failed.length} missing ${usesEmail ? 'an email address' : 'a phone number'}` : ''}. Development preview only — nothing was actually sent.`)
+  }
+
+  function shareMethodLabel(method) {
+    return ({ whatsapp: 'WhatsApp', viber: 'Viber', email: 'Email', sms: 'SMS' })[method] ?? method
   }
 
   function updateSelectedGuestStatus(status) {
@@ -393,12 +433,13 @@
     bulkDeleteRequest = null
   }
 
-  function toggleGuestMenu(guestId) {
-    openGuestMenuId = openGuestMenuId === guestId ? '' : guestId
+  function toggleRowMenu(type, id) {
+    const key = `${type}:${id}`
+    openRowMenuKey = openRowMenuKey === key ? '' : key
   }
 
   function closeGuestMenuFromOutside(event) {
-    if (!event.target.closest?.('.guest-action-menu')) openGuestMenuId = ''
+    if (!event.target.closest?.('.guest-action-menu')) openRowMenuKey = ''
     if (!event.target.closest?.('.general-note-card')) {
       if (document.activeElement?.closest?.('.general-note-card')) document.activeElement.blur()
       activeGeneralNoteId = ''
@@ -419,7 +460,7 @@
     editingGuestId = guest.id
     editingGuestField = ''
     guestEditDirty = false
-    openGuestMenuId = ''
+    openRowMenuKey = ''
     showGuestForm = false
   }
 
@@ -949,9 +990,9 @@
     if (editingGiftId) {
       data = { ...data, gifts: data.gifts.map((gift) => gift.id === editingGiftId ? { ...gift, ...values } : gift) }
     } else {
-      data = { ...data, gifts: [createGift(values), ...data.gifts] }
+      data = { ...data, gifts: [{ ...createGift(values), thanked: Boolean(values.thanked) }, ...data.gifts] }
     }
-    giftForm = { guestId: '', guest: '', type: 'money', amount: '', currency: 'EUR', gift: '', note: '' }
+    giftForm = { guestId: '', guest: '', type: 'money', amount: '', currency: 'EUR', gift: '', note: '', thanked: false }
     showGiftForm = false
     onNotify(editingGiftId ? 'Gift changes saved.' : 'Gift added.')
     editingGiftId = ''
@@ -959,15 +1000,21 @@
 
   function openGiftForm(guest = null) {
     editingGiftId = ''
-    giftForm = { guestId: guest?.id ?? '', guest: guest?.name ?? '', type: 'money', amount: '', currency: 'EUR', gift: '', note: '' }
+    giftForm = { guestId: guest?.id ?? '', guest: guest?.name ?? '', type: 'money', amount: '', currency: 'EUR', gift: '', note: '', thanked: false }
     showGiftForm = true
     if (guest) navigate('gifts')
   }
 
   function openGiftEditModal(gift) {
-    giftForm = { guestId: gift.guestId ?? '', guest: gift.guest ?? '', type: gift.type ?? 'money', amount: gift.amount ?? '', currency: gift.currency ?? 'EUR', gift: gift.gift ?? '', note: gift.note ?? '' }
+    giftForm = { guestId: gift.guestId ?? '', guest: gift.guest ?? '', type: gift.type ?? 'money', amount: gift.amount ?? '', currency: gift.currency ?? 'EUR', gift: gift.gift ?? '', note: gift.note ?? '', thanked: Boolean(gift.thanked) }
     editingGiftId = gift.id
     showGiftForm = true
+  }
+
+  function updateGiftGuestName(value) {
+    const matchingGuest = data.guests.find((guest) => guest.name.toLowerCase() === value.trim().toLowerCase())
+    giftForm.guest = value
+    giftForm.guestId = matchingGuest?.id ?? ''
   }
 
   function songTypeLabel(type) {
@@ -1100,16 +1147,38 @@
   }
 
   function openMessageEditModal(message) {
-    messageForm = { name: message.name ?? '', email: message.email ?? '', phone: message.phone ?? '', message: message.message ?? '', read: Boolean(message.read) }
+    messageForm = { name: message.name ?? '', email: message.email ?? '', phone: message.phone ?? '', message: message.message ?? '', read: Boolean(message.read), sentAt: toDateTimeLocal(message.sentAt) }
     editingMessageId = message.id
+    showMessageForm = true
   }
 
   function saveMessageEdit(event) {
     event.preventDefault()
-    if (!editingMessageId || !messageForm.name.trim() || !messageForm.message.trim()) return
-    updateMessage(editingMessageId, { ...messageForm, name: messageForm.name.trim(), message: messageForm.message.trim() })
+    if (!messageForm.name.trim() || !messageForm.message.trim()) return
+    const wasEditing = Boolean(editingMessageId)
+    const values = { ...messageForm, name: messageForm.name.trim(), message: messageForm.message.trim(), sentAt: messageForm.sentAt ? new Date(messageForm.sentAt).toISOString() : new Date().toISOString() }
+    if (editingMessageId) {
+      updateMessage(editingMessageId, values)
+    } else {
+      const message = { id: `message-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`, guestId: '', ...values }
+      data = { ...data, messages: [message, ...(data.messages ?? [])] }
+    }
+    showMessageForm = false
     editingMessageId = ''
-    onNotify('Message changes saved.')
+    onNotify(wasEditing ? 'Message changes saved.' : 'Message added.')
+  }
+
+  function openMessageForm() {
+    messageForm = { name: '', email: '', phone: '', message: '', read: false, sentAt: toDateTimeLocal(new Date().toISOString()) }
+    editingMessageId = ''
+    showMessageForm = true
+  }
+
+  function toDateTimeLocal(value) {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+    const offset = date.getTimezoneOffset() * 60000
+    return new Date(date.getTime() - offset).toISOString().slice(0, 16)
   }
 
   function removeMessage(messageId) {
@@ -1147,7 +1216,7 @@
   }
 
   function downloadGuestCsv() {
-    downloadCsv('guest-list.csv', ['Name', 'Adults', 'Children', 'Party size', 'Email', 'Phone', 'Note', 'RSVP', 'Table'], sortedGuests.map((guest) => [
+    downloadCsv('guest-list.csv', ['Name', 'Adults', 'Children', 'Party size', 'Email', 'Phone', 'Note', 'Invited', 'Invitation method', 'RSVP', 'Table'], sortedGuests.map((guest) => [
       guest.name,
       guestAdults(guest),
       guestChildren(guest),
@@ -1155,6 +1224,8 @@
       guest.email,
       guest.phone,
       guest.meal || guest.note,
+      guest.invitedVia ? 'Yes' : 'No',
+      guest.invitedVia ? shareMethodLabel(guest.invitedVia) : '',
       guest.status,
       data.tables.find((table) => table.id === guest.tableId)?.name ?? '',
     ]))
@@ -1266,7 +1337,10 @@
     showTableForm = false
     showGiftForm = false
     showMusicForm = false
+    showMessageForm = false
     showVendorForm = false
+    shareGuestIds = []
+    shareResult = null
     editingGuestId = ''
     editingGiftId = ''
     editingSongId = ''
@@ -1673,7 +1747,10 @@
 <svelte:window
   onclick={closeGuestMenuFromOutside}
   onkeydown={(event) => {
-    if (event.key === 'Escape') openGuestMenuId = ''
+    if (event.key === 'Escape') {
+      openRowMenuKey = ''
+      closeForms()
+    }
     handleFloorShapeDeleteKey(event)
   }}
   onpointerdown={beginFloorGesture}
@@ -1746,7 +1823,7 @@
         <section class="dashboard-view dashboard-overview" aria-labelledby="dashboard-heading">
           <header class="dashboard-page-heading dashboard-page-heading--overview">
             <div>
-              <p class="dashboard-eyebrow">Good morning, {account.firstName}</p>
+              <p class="dashboard-eyebrow">Welcome back, {account.firstName}✨</p>
               <h1 id="dashboard-heading">Your celebration,<br /><em>beautifully organised.</em></h1>
             </div>
           </header>
@@ -1802,7 +1879,7 @@
           </header>
 
           <div class="table-topbar">
-            <div class="table-topbar-left"><label class="table-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={guestSearch} placeholder="Search guests" aria-label="Search guests or email" /><span>{filteredGuests.length}</span></label>{#if visibleSelectedGuestIds.length > 0}<div class="table-selected-actions"><span>{visibleSelectedGuestIds.length} selected</span><label class="bulk-rsvp-control"><select aria-label="Change RSVP for selected guests" onchange={(event) => updateSelectedGuestStatus(event.currentTarget.value)}><option value="" selected disabled>RSVP</option><option value="attending">Attending</option><option value="pending">Pending</option><option value="declined">Declined</option></select></label><button type="button" class="bulk-delete-button" aria-label="Delete selected guests" title="Delete selected" onclick={() => requestBulkDelete('guests')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div>
+            <div class="table-topbar-left"><label class="table-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={guestSearch} placeholder="Search guests" aria-label="Search guests or email" /><span>{filteredGuests.length}</span></label>{#if visibleSelectedGuestIds.length > 0}<div class="table-selected-actions"><span>{visibleSelectedGuestIds.length} selected</span><label class="bulk-rsvp-control"><select aria-label="Change RSVP for selected guests" onchange={(event) => updateSelectedGuestStatus(event.currentTarget.value)}><option value="" selected disabled>RSVP</option><option value="attending">Attending</option><option value="pending">Pending</option><option value="declined">Declined</option></select></label><button type="button" class="bulk-share-button" onclick={() => openGuestShareModal(visibleSelectedGuestIds)}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.7 10.7 6.6-4.1M8.7 13.3l6.6 4.1" /></svg>Invite</button><button type="button" class="bulk-delete-button" aria-label="Delete selected guests" title="Delete selected" onclick={() => requestBulkDelete('guests')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div>
             <div class="table-topbar-right"><div class="table-filter-chips" role="group" aria-label="Filter guests by RSVP"><button class:active={rsvpFilter === 'all'} type="button" onclick={() => (rsvpFilter = 'all')}>All <strong>{summary.total}</strong></button><button class:active={rsvpFilter === 'attending'} type="button" onclick={() => (rsvpFilter = 'attending')}>Attending <strong>{summary.attending}</strong></button><button class:active={rsvpFilter === 'pending'} type="button" onclick={() => (rsvpFilter = 'pending')}>Pending <strong>{summary.pending}</strong></button><button class:active={rsvpFilter === 'declined'} type="button" onclick={() => (rsvpFilter = 'declined')}>Declined <strong>{summary.declined}</strong></button></div><button class="table-download-button" type="button" onclick={downloadGuestCsv} aria-label="Download guest list CSV" title="Download to CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div>
           </div>
 
@@ -1813,79 +1890,29 @@
                 <th aria-sort={guestSort.key === 'party' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={guestSort.key === 'party'} type="button" onclick={() => sortGuests('party')}>Guests <span aria-hidden="true">{sortArrow(guestSort, 'party')}</span></button></th>
                 <th aria-sort={guestSort.key === 'email' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={guestSort.key === 'email'} type="button" onclick={() => sortGuests('email')}>Contact details <span aria-hidden="true">{sortArrow(guestSort, 'email')}</span></button></th>
                 <th aria-sort={guestSort.key === 'meal' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={guestSort.key === 'meal'} type="button" onclick={() => sortGuests('meal')}>Note <span aria-hidden="true">{sortArrow(guestSort, 'meal')}</span></button></th>
+                <th aria-sort={guestSort.key === 'invitedVia' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={guestSort.key === 'invitedVia'} type="button" onclick={() => sortGuests('invitedVia')}>Invitation <span aria-hidden="true">{sortArrow(guestSort, 'invitedVia')}</span></button></th>
                 <th aria-sort={guestSort.key === 'status' ? (guestSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={guestSort.key === 'status'} type="button" onclick={() => sortGuests('status')}>RSVP <span aria-hidden="true">{sortArrow(guestSort, 'status')}</span></button></th>
                 <th class="guest-action-heading"><span class="sr-only">Actions</span></th>
               </tr></thead>
               <tbody>
-                {#if showGuestForm}
-                  <tr class="dashboard-inline-row">
-                    <td><input bind:value={guestForm.name} aria-label="Guest name" required placeholder="Full name" /></td>
-                    <td><div class="guest-party-fields"><label><span>Adults</span><select bind:value={guestForm.adults} aria-label="Number of adults">{#each Array(20) as _, index}<option value={index + 1}>{index + 1}</option>{/each}</select></label><label><span>Children</span><select bind:value={guestForm.children} aria-label="Number of children">{#each Array(11) as _, index}<option value={index}>{index}</option>{/each}</select></label></div></td>
-                    <td><div class="guest-contact"><input bind:value={guestForm.email} type="email" aria-label="Guest email" placeholder="Email" /><input bind:value={guestForm.phone} type="tel" aria-label="Guest phone" placeholder="Phone" /></div></td>
-                    <td><input class="guest-note-input" bind:value={guestForm.meal} aria-label="Guest note" placeholder="Add note" /></td>
-                    <td><select class={`status-select status-select--${guestForm.status}`} bind:value={guestForm.status} aria-label="Attendance status"><option value="attending">Attending</option><option value="pending">Pending</option><option value="declined">Declined</option></select></td>
-                    <td class="guest-row-action-cell"><div class="inline-row-actions guest-row-actions"><button class="guest-save-button" type="button" onclick={addGuest} aria-label="Save guest" title="Save guest">Save</button><button class="guest-cancel-button" type="button" onclick={cancelGuestRow} aria-label="Close guest row" title="Close">×</button></div></td>
-                  </tr>
-                {/if}
                 {#each sortedGuests as guest, index}
-                  {@const isEditing = editingGuestId === guest.id}
                   <tr>
-                    <td>
-                      <input class="bulk-select-checkbox" type="checkbox" checked={selectedGuestIds.includes(guest.id)} onchange={() => toggleGuestSelection(guest.id)} aria-label={`Select ${guest.name}`} />
-                      <i class={avatarTone(guest.id || guest.name)}>{guest.name.slice(0, 1)}</i>
-                      {#if isEditing && editingGuestField === 'name'}
-                        <input class="guest-inline-editor" data-guest-edit="name" bind:value={guestEditForm.name} oninput={markGuestEditDirty} onblur={saveGuestEdit} aria-label="Guest name" />
-                      {:else if isEditing}
-                        <button class="guest-edit-value guest-edit-value--strong" type="button" onclick={() => openGuestField('name', guest)}>{guestEditForm.name}</button>
-                      {:else}
-                        <button class="guest-edit-value guest-edit-value--strong" type="button" onclick={() => openGuestField('name', guest)}>{guest.name}</button>
-                      {/if}
-                    </td>
-                    <td>
-                      {#if isEditing && editingGuestField === 'party'}
-                        <div class="guest-party-fields guest-party-fields--inline"><label><span>Adults</span><select data-guest-edit="party" bind:value={guestEditForm.adults} onchange={(event) => saveGuestPartyChange(event, 'adults')} aria-label="Number of adults">{#each Array(20) as _, optionIndex}<option value={optionIndex + 1}>{optionIndex + 1}</option>{/each}</select></label><label><span>Children</span><select bind:value={guestEditForm.children} onchange={(event) => saveGuestPartyChange(event, 'children')} aria-label="Number of children">{#each Array(11) as _, optionIndex}<option value={optionIndex}>{optionIndex}</option>{/each}</select></label></div>
-                      {:else if isEditing}
-                        <button class="guest-edit-value guest-party-label" type="button" onclick={() => openGuestField('party', guest)}>{partyLabel(guestEditForm)}</button>
-                      {:else}
-                        <button class="guest-edit-value guest-party-label" type="button" onclick={() => openGuestField('party', guest)}>{partyLabel(guest)}</button>
-                      {/if}
-                    </td>
-                    <td>
-                      {#if isEditing && editingGuestField === 'contact'}
-                        <div class="guest-contact guest-contact--inline"><input class="guest-inline-editor" data-guest-edit="contact" bind:value={guestEditForm.email} oninput={markGuestEditDirty} onblur={saveGuestEdit} type="email" aria-label="Guest email" placeholder="Email" /><input class="guest-inline-editor" bind:value={guestEditForm.phone} oninput={markGuestEditDirty} onblur={saveGuestEdit} type="tel" aria-label="Guest phone" placeholder="Phone" /></div>
-                      {:else if isEditing}
-                        <button class="guest-edit-value" type="button" onclick={() => openGuestField('contact', guest)}>{[guestEditForm.email, guestEditForm.phone].filter(Boolean).join(', ') || 'No contact details'}</button>
-                      {:else}
-                        <button class="guest-edit-value" type="button" onclick={() => openGuestField('contact', guest)}>{[guest.email, guest.phone].filter(Boolean).join(', ') || 'No contact details'}</button>
-                      {/if}
-                    </td>
-                    <td>
-                      {#if isEditing && editingGuestField === 'meal'}
-                        <input class="guest-inline-editor" data-guest-edit="meal" bind:value={guestEditForm.meal} oninput={markGuestEditDirty} onblur={saveGuestEdit} aria-label="Guest note" placeholder="Not provided" />
-                      {:else if isEditing}
-                        <button class="guest-edit-value" type="button" onclick={() => openGuestField('meal', guest)}>{guestEditForm.meal || 'Not provided'}</button>
-                      {:else}
-                        <button class="guest-edit-value guest-note-text" type="button" onclick={() => openGuestField('meal', guest)}>{guest.meal || 'Not provided'}</button>
-                      {/if}
-                    </td>
-                    <td>
-                      {#if isEditing}
-                        <select class={`status-select status-select--${guestEditForm.status}`} bind:value={guestEditForm.status} onchange={(event) => changeGuestStatus(guest, event.currentTarget.value)} aria-label={`Attendance status for ${guest.name}`}><option value="attending">Attending</option><option value="pending">Pending</option><option value="declined">Declined</option></select>
-                      {:else}
-                        <select class={`status-select status-select--${guest.status}`} value={guest.status} onchange={(event) => changeGuestStatus(guest, event.currentTarget.value)} aria-label={`Attendance status for ${guest.name}`}><option value="attending">Attending</option><option value="pending">Pending</option><option value="declined">Declined</option></select>
-                      {/if}
-                    </td>
+                    <td><input class="bulk-select-checkbox" type="checkbox" checked={selectedGuestIds.includes(guest.id)} onchange={() => toggleGuestSelection(guest.id)} aria-label={`Select ${guest.name}`} /><i class={avatarTone(guest.id || guest.name)}>{guest.name.slice(0, 1)}</i><span><strong>{guest.name}</strong></span></td>
+                    <td><span>{partyLabel(guest)}</span></td>
+                    <td><span class="guest-contact-copy"><span>{guest.email || 'No email'}</span><small>{guest.phone || 'No phone'}</small></span></td>
+                    <td><span class="guest-note-text">{guest.meal || 'Not provided'}</span></td>
+                    <td><span class:invited={guest.invitedVia} class="invitation-status"><strong>{guest.invitedVia ? 'Invited' : 'Not invited'}</strong>{#if guest.invitedVia}<small>via {shareMethodLabel(guest.invitedVia)}</small>{/if}</span></td>
+                    <td><span class={`status-select status-select--${guest.status}`}>{guest.status === 'attending' ? 'Attending' : guest.status === 'declined' ? 'Declined' : 'Pending'}</span></td>
                     <td class="guest-row-action-cell">
                       <div class="guest-action-menu">
-                        <button class="guest-menu-trigger" type="button" onclick={() => toggleGuestMenu(guest.id)} aria-label={`Actions for ${guest.name}`} aria-haspopup="menu" aria-expanded={openGuestMenuId === guest.id}>
+                        <button class="guest-menu-trigger" type="button" onclick={() => toggleRowMenu('guest', guest.id)} aria-label={`Actions for ${guest.name}`} aria-haspopup="menu" aria-expanded={openRowMenuKey === `guest:${guest.id}`}>
                           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="12" cy="19" r="1.6" /></svg>
                         </button>
-                        {#if openGuestMenuId === guest.id}
+                        {#if openRowMenuKey === `guest:${guest.id}`}
                           <div class:opens-up={index >= sortedGuests.length - 2} class="guest-menu-popover" role="menu">
-                            <button class="danger" type="button" role="menuitem" onclick={() => { openGuestMenuId = ''; guestToDelete = guest }}>
-                              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg>
-                              Delete
-                            </button>
+                            <button type="button" role="menuitem" onclick={() => { openRowMenuKey = ''; openGuestEditModal(guest) }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" /></svg>Edit</button>
+                            <button type="button" role="menuitem" onclick={() => openGuestShareModal([guest.id])}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.7 10.7 6.6-4.1M8.7 13.3l6.6 4.1" /></svg>Invite</button>
+                            <button class="danger" type="button" role="menuitem" onclick={() => { openRowMenuKey = ''; guestToDelete = guest }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg>Delete</button>
                           </div>
                         {/if}
                       </div>
@@ -2049,17 +2076,7 @@
                 <th class="table-actions-heading"><span class="sr-only">Actions</span></th>
               </tr></thead>
               <tbody>
-                {#if showGiftForm}
-                  <tr class="dashboard-inline-row dashboard-inline-gift-row">
-                    <td><div class="inline-guest-picker"><select bind:value={giftForm.guestId} aria-label="Select guest"><option value="">Other / not listed</option>{#each data.guests as guest}<option value={guest.id}>{guest.name}</option>{/each}</select>{#if !giftForm.guestId}<input bind:value={giftForm.guest} aria-label="Gift giver name" required placeholder="Guest name" />{/if}</div></td>
-                    <td><select bind:value={giftForm.type} aria-label="Gift type"><option value="money">Money</option><option value="item">Item or other</option></select></td>
-                    <td>{#if giftForm.type === 'money'}<div class="inline-money-fields"><select bind:value={giftForm.currency} aria-label="Currency"><option value="EUR">€ EUR</option><option value="GBP">£ GBP</option><option value="USD">$ USD</option></select><input bind:value={giftForm.amount} type="number" min="0" step="0.01" required aria-label="Gift amount" placeholder="Amount" /></div>{:else}<input bind:value={giftForm.gift} required aria-label="Gift description" placeholder="What they brought" />{/if}</td>
-                    <td><textarea bind:value={giftForm.note} rows="2" aria-label="Gift note" placeholder="Optional note"></textarea></td>
-                    <td><span class="inline-empty-value">Pending</span></td>
-                    <td><div class="inline-row-actions"><button type="button" onclick={addGift}>Save</button><button type="button" onclick={() => (showGiftForm = false)}>Cancel</button></div></td>
-                  </tr>
-                {/if}
-                {#each sortedGifts as gift}<tr class:thanked={gift.thanked}><td><input class="bulk-select-checkbox" type="checkbox" checked={selectedGiftIds.includes(gift.id)} onchange={() => toggleGiftSelection(gift.id)} aria-label={`Select gift from ${gift.guest}`} /><i class={avatarTone(gift.guestId || gift.guest)}>{gift.guest.slice(0, 1)}</i><span><strong>{gift.guest}</strong><small>{gift.guestId ? 'Guest list' : 'Not on guest list'}</small></span></td><td><span class={`gift-type gift-type--${gift.type}`}>{gift.type === 'money' ? 'Money' : 'Item'}</span></td><td><strong class="gift-value">{giftLabel(gift)}</strong></td><td><span class="gift-note">{gift.note || 'No note added'}</span></td><td><button class="gift-thank-toggle" class:active={gift.thanked} type="button" onclick={() => toggleThanked(gift.id)} aria-pressed={gift.thanked}><i>{gift.thanked ? '✓' : ''}</i>{gift.thanked ? 'Thanked' : 'Pending'}</button></td><td><button class="dashboard-row-remove" type="button" onclick={() => removeGift(gift.id)} aria-label={`Remove gift from ${gift.guest}`}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></td></tr>{/each}
+                {#each sortedGifts as gift, index}<tr class:thanked={gift.thanked}><td><input class="bulk-select-checkbox" type="checkbox" checked={selectedGiftIds.includes(gift.id)} onchange={() => toggleGiftSelection(gift.id)} aria-label={`Select gift from ${gift.guest}`} /><i class={avatarTone(gift.guestId || gift.guest)}>{gift.guest.slice(0, 1)}</i><span><strong>{gift.guest}</strong></span></td><td><span class={`gift-type gift-type--${gift.type}`}>{gift.type === 'money' ? 'Money' : 'Item'}</span></td><td><strong class="gift-value">{giftLabel(gift)}</strong></td><td><span class="gift-note">{gift.note || 'No note added'}</span></td><td><span class="gift-thank-toggle" class:active={gift.thanked}><i>{gift.thanked ? '✓' : ''}</i>{gift.thanked ? 'Thanked' : 'Pending'}</span></td><td class="table-row-menu-cell"><div class="guest-action-menu"><button class="guest-menu-trigger" type="button" onclick={() => toggleRowMenu('gift', gift.id)} aria-label={`Actions for gift from ${gift.guest}`} aria-haspopup="menu" aria-expanded={openRowMenuKey === `gift:${gift.id}`}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="12" cy="19" r="1.6" /></svg></button>{#if openRowMenuKey === `gift:${gift.id}`}<div class:opens-up={index >= sortedGifts.length - 2} class="guest-menu-popover" role="menu"><button type="button" role="menuitem" onclick={() => { openRowMenuKey = ''; openGiftEditModal(gift) }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" /></svg>Edit</button><button class="danger" type="button" role="menuitem" onclick={() => { openRowMenuKey = ''; removeGift(gift.id) }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg>Delete</button></div>{/if}</div></td></tr>{/each}
               </tbody>
             </table>
           </div>
@@ -2080,22 +2097,14 @@
                 <th><span class="sr-only">Actions</span></th>
               </tr></thead>
               <tbody>
-                {#if showMusicForm}
-                  <tr class="dashboard-inline-row dashboard-inline-music-row">
-                    <td><input bind:value={musicForm.name} oninput={scheduleMusicMetadataLookup} aria-label="Music title" placeholder={musicMetadataLoading ? 'Finding title…' : 'Title and artist'} /></td>
-                    <td><div class="music-inline-link-field"><input bind:value={musicForm.link} oninput={scheduleMusicMetadataLookup} type="text" inputmode="url" aria-invalid={musicLinkError ? 'true' : undefined} aria-describedby={musicLinkError ? 'music-link-error' : 'music-link-help'} placeholder="Optional music link" />{#if musicMetadataLoading}<small id="music-link-help">Finding title and artist…</small>{:else if detectedMusicLink}<small id="music-link-help" class="music-link-detected">✓ {detectedMusicLink.platformLabel} detected</small>{:else if musicForm.link.trim()}<small id="music-link-help">Saved as an external link without a player.</small>{:else}<small id="music-link-help">Optional · Spotify, Apple Music, or YouTube Music</small>{/if}{#if musicLinkError}<small id="music-link-error" class="music-link-error">{musicLinkError}</small>{/if}</div></td>
-                    <td><select bind:value={musicForm.type} aria-label="Music type"><option value="entrance">Entrance</option><option value="first-dance">First dance</option><option value="parent-dance">Parent dance</option><option value="cake-cutting">Cake cutting</option><option value="party">Party</option><option value="reception">Reception</option><option value="other">Other</option></select></td>
-                    <td><div class="inline-row-actions"><button type="button" disabled={musicSaving} onclick={addSong}>{musicSaving ? 'Saving…' : 'Save'}</button><button type="button" onclick={() => (showMusicForm = false)}>Cancel</button></div></td>
-                  </tr>
-                {/if}
-                {#each sortedSongs as song (song.id)}
+                {#each sortedSongs as song, index (song.id)}
                   {@const music = musicDetails(song.link)}
-                  <tr class:music-row-open={openMusicPlayerId === song.id}><td><input class="bulk-select-checkbox" type="checkbox" checked={selectedSongIds.includes(song.id)} onchange={() => toggleSongSelection(song.id)} aria-label={`Select ${song.name}`} /><span class="music-song-name"><i aria-hidden="true">♪</i><strong>{song.name}</strong></span></td><td>{#if music}<div class={`music-table-player-bar music-table-player-bar--${music.platform}`}><span><i aria-hidden="true"></i>{music.platformLabel} {music.kindLabel}</span><button type="button" aria-expanded={openMusicPlayerId === song.id} aria-controls={`music-player-${song.id}`} onclick={() => (openMusicPlayerId = openMusicPlayerId === song.id ? '' : song.id)}>{openMusicPlayerId === song.id ? 'Close' : 'Open player'}</button></div>{:else if song.link}<a class="music-link" href={songLinkHref(song.link)} target="_blank" rel="noreferrer">Open link <span aria-hidden="true">↗</span></a>{:else}<span class="music-no-link">No link</span>{/if}</td><td><span class={`music-type music-type--${song.type}`}>{songTypeLabel(song.type)}</span></td><td><button class="dashboard-row-remove" type="button" onclick={() => removeSong(song.id)} aria-label={`Remove ${song.name}`}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></td></tr>
+                  <tr class:music-row-open={openMusicPlayerId === song.id}><td><input class="bulk-select-checkbox" type="checkbox" checked={selectedSongIds.includes(song.id)} onchange={() => toggleSongSelection(song.id)} aria-label={`Select ${song.name}`} /><span class="music-song-name"><i aria-hidden="true">♪</i><strong>{song.name}</strong></span></td><td>{#if music}<div class={`music-table-player-bar music-table-player-bar--${music.platform}`}><span><i aria-hidden="true"></i>{music.platformLabel} {music.kindLabel}</span><button type="button" aria-expanded={openMusicPlayerId === song.id} aria-controls={`music-player-${song.id}`} onclick={() => (openMusicPlayerId = openMusicPlayerId === song.id ? '' : song.id)}>{openMusicPlayerId === song.id ? 'Close' : 'Open player'}</button></div>{:else if song.link}<a class="music-link" href={songLinkHref(song.link)} target="_blank" rel="noreferrer">Open link <span aria-hidden="true">↗</span></a>{:else}<span class="music-no-link">No link</span>{/if}</td><td><span class={`music-type music-type--${song.type}`}>{songTypeLabel(song.type)}</span></td><td class="table-row-menu-cell"><div class="guest-action-menu"><button class="guest-menu-trigger" type="button" onclick={() => toggleRowMenu('music', song.id)} aria-label={`Actions for ${song.name}`} aria-haspopup="menu" aria-expanded={openRowMenuKey === `music:${song.id}`}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="12" cy="19" r="1.6" /></svg></button>{#if openRowMenuKey === `music:${song.id}`}<div class:opens-up={index >= sortedSongs.length - 2} class="guest-menu-popover" role="menu"><button type="button" role="menuitem" onclick={() => { openRowMenuKey = ''; openMusicEditModal(song) }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" /></svg>Edit</button><button class="danger" type="button" role="menuitem" onclick={() => { openRowMenuKey = ''; removeSong(song.id) }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg>Delete</button></div>{/if}</div></td></tr>
                   {#if music && openMusicPlayerId === song.id}
                     <tr class="music-expanded-player-row"><td colspan="4"><div id={`music-player-${song.id}`} class="music-expanded-player"><iframe class={`music-embed music-embed--${music.platform}`} src={music.embedUrl} title={`${song.name} on ${music.platformLabel}`} height={music.height} loading="lazy" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" allowfullscreen></iframe><div><p>Playback availability depends on the visitor’s region, login, and subscription.</p><a href={musicFallbackUrl(song.link)} target="_blank" rel="noreferrer">Open in Music App <span aria-hidden="true">↗</span></a></div></div></td></tr>
                   {/if}
                 {:else}
-                  {#if !showMusicForm}<tr class="music-empty-row"><td colspan="4"><p>No songs added yet. Add your first song to start planning the soundtrack.</p></td></tr>{/if}
+                  <tr class="music-empty-row"><td colspan="4"><p>No songs added yet. Add your first song to start planning the soundtrack.</p></td></tr>
                 {/each}
               </tbody>
             </table>
@@ -2106,6 +2115,7 @@
         <section class="dashboard-view" aria-labelledby="messages-heading">
           <header class="dashboard-page-heading">
             <div><h1 id="messages-heading">Messages</h1><p>Read the notes your guests leave through your event website.</p></div>
+            <button class="dashboard-primary" type="button" onclick={openMessageForm}>+ Add message</button>
           </header>
 
           <div class="table-topbar"><div class="table-topbar-left"><label class="table-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={messageSearch} placeholder="Search messages" aria-label="Search messages" /><span>{filteredMessages.length}</span></label>{#if visibleSelectedMessageIds.length > 0}<div class="table-selected-actions"><span>{visibleSelectedMessageIds.length} selected</span><button type="button" class="bulk-delete-button" aria-label="Delete selected messages" title="Delete selected" onclick={() => requestBulkDelete('messages')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div><div class="table-topbar-right"><div class="table-filter-chips" role="group" aria-label="Filter messages"><button class:active={messageFilter === 'all'} type="button" onclick={() => (messageFilter = 'all')}>All <strong>{(data.messages ?? []).length}</strong></button><button class:active={messageFilter === 'unread'} type="button" onclick={() => (messageFilter = 'unread')}>Unread <strong>{(data.messages ?? []).filter((message) => !message.read).length}</strong></button><button class:active={messageFilter === 'read'} type="button" onclick={() => (messageFilter = 'read')}>Read <strong>{(data.messages ?? []).filter((message) => message.read).length}</strong></button></div><button class="table-download-button" type="button" onclick={downloadMessageCsv} aria-label="Download messages CSV" title="Download to CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></div>
@@ -2121,14 +2131,14 @@
                 <th><span class="sr-only">Actions</span></th>
               </tr></thead>
               <tbody>
-                {#each sortedMessages as message (message.id)}
+                {#each sortedMessages as message, index (message.id)}
                   <tr class:unread={!message.read}>
                     <td><input class="bulk-select-checkbox" type="checkbox" checked={selectedMessageIds.includes(message.id)} onchange={() => toggleMessageSelection(message.id)} aria-label={`Select message from ${message.name}`} /><i class={avatarTone(message.guestId || message.name)}>{message.name.slice(0, 1)}</i><span><strong>{message.name}</strong><small>{message.guestId ? 'Guest list' : 'Website visitor'}</small></span></td>
                     <td><time datetime={message.sentAt}>{formatMessageDate(message.sentAt)}</time></td>
                     <td><span class="message-contact">{#if message.email}<a href={`mailto:${message.email}`}>{message.email}</a>{/if}{#if message.phone}<a href={`tel:${message.phone}`}>{message.phone}</a>{/if}{#if !message.email && !message.phone}<small>No contact details</small>{/if}</span></td>
                     <td><p class="message-copy">{message.message}</p></td>
-                    <td><button class:active={message.read} class="message-read-toggle" type="button" aria-pressed={message.read} onclick={() => updateMessage(message.id, { read: !message.read })}><i>{message.read ? '✓' : ''}</i>{message.read ? 'Read' : 'Mark as read'}</button></td>
-                    <td><button class="dashboard-row-remove" type="button" aria-label={`Delete message from ${message.name}`} onclick={() => removeMessage(message.id)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></td>
+                    <td><span class:active={message.read} class="message-read-toggle"><i>{message.read ? '✓' : ''}</i>{message.read ? 'Read' : 'Unread'}</span></td>
+                    <td class="table-row-menu-cell"><div class="guest-action-menu"><button class="guest-menu-trigger" type="button" onclick={() => toggleRowMenu('message', message.id)} aria-label={`Actions for message from ${message.name}`} aria-haspopup="menu" aria-expanded={openRowMenuKey === `message:${message.id}`}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="12" cy="19" r="1.6" /></svg></button>{#if openRowMenuKey === `message:${message.id}`}<div class:opens-up={index >= sortedMessages.length - 2} class="guest-menu-popover" role="menu"><button type="button" role="menuitem" onclick={() => { openRowMenuKey = ''; openMessageEditModal(message) }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" /></svg>Edit</button><button class="danger" type="button" role="menuitem" onclick={() => { openRowMenuKey = ''; removeMessage(message.id) }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg>Delete</button></div>{/if}</div></td>
                   </tr>
                 {:else}
                   <tr class="message-empty-row"><td colspan="6"><p>No guest messages yet. Messages submitted through your website will appear here.</p></td></tr>
@@ -2142,7 +2152,7 @@
         <section class="dashboard-view" aria-labelledby="vendors-heading">
           <header class="dashboard-page-heading">
             <div><h1 id="vendors-heading">Vendors</h1><p>Keep every supplier, contact, quote and booking detail together.</p></div>
-            <button class="dashboard-primary" type="button" onclick={() => (showVendorForm = true)}>+ Add vendor</button>
+            <button class="dashboard-primary" type="button" onclick={openVendorForm}>+ Add vendor</button>
           </header>
 
           <div class="table-topbar"><div class="table-topbar-left"><label class="table-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={vendorSearch} placeholder="Search vendors" aria-label="Search vendors" /><span>{filteredVendors.length}</span></label>{#if visibleSelectedVendorIds.length > 0}<div class="table-selected-actions"><span>{visibleSelectedVendorIds.length} selected</span><button type="button" class="bulk-delete-button" aria-label="Delete selected vendors" title="Delete selected" onclick={() => requestBulkDelete('vendors')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div><div class="table-topbar-right"><div class="table-filter-chips" role="group" aria-label="Vendor status and budget"><button class:active={vendorFilter === 'all'} type="button" onclick={() => (vendorFilter = 'all')}>All <strong>{(data.vendors ?? []).length}</strong></button><button class:active={vendorFilter === 'booked'} type="button" onclick={() => (vendorFilter = 'booked')}>Booked <strong>{(data.vendors ?? []).filter((vendor) => ['booked', 'paid'].includes(vendor.status)).length}</strong></button><button class:active={vendorFilter === 'planning'} type="button" onclick={() => (vendorFilter = 'planning')}>Planning <strong>{(data.vendors ?? []).filter((vendor) => !['booked', 'paid'].includes(vendor.status)).length}</strong></button><span class="table-info-chip">Budget <strong>€{(data.vendors ?? []).reduce((total, vendor) => total + (Number(vendor.cost) || 0), 0).toLocaleString()}</strong></span></div><button class="table-download-button" type="button" onclick={downloadVendorCsv} aria-label="Download vendors CSV" title="Download to CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></div>
@@ -2159,35 +2169,18 @@
                 <th><span class="sr-only">Actions</span></th>
               </tr></thead>
               <tbody>
-                {#if showVendorForm}
-                  <tr class="vendor-form-row"><td colspan="7">
-                    <form class="vendor-inline-form" onsubmit={addVendor}>
-                      <label><span>Vendor or company *</span><input bind:value={vendorForm.name} required placeholder="Company name" /></label>
-                      <label><span>Category</span><select bind:value={vendorForm.category}><option>Venue</option><option>Catering</option><option>Photography</option><option>Videography</option><option>Flowers</option><option>Music / DJ</option><option>Decor</option><option>Transport</option><option>Entertainment</option><option>Beauty</option><option>Stationery</option><option>Other</option></select></label>
-                      <label><span>Contact person</span><input bind:value={vendorForm.contact} placeholder="Full name" /></label>
-                      <label><span>Email</span><input bind:value={vendorForm.email} type="email" placeholder="hello@example.com" /></label>
-                      <label><span>Phone</span><input bind:value={vendorForm.phone} type="tel" placeholder="Phone number" /></label>
-                      <label><span>Website</span><input bind:value={vendorForm.website} type="text" placeholder="example.com" /></label>
-                      <label><span>Estimated cost (€)</span><input bind:value={vendorForm.cost} type="number" min="0" step="0.01" placeholder="0" /></label>
-                      <label><span>Deposit paid (€)</span><input bind:value={vendorForm.deposit} type="number" min="0" step="0.01" placeholder="0" /></label>
-                      <label><span>Status</span><select bind:value={vendorForm.status}><option value="researching">Researching</option><option value="contacted">Contacted</option><option value="quoted">Quote received</option><option value="booked">Booked</option><option value="paid">Paid</option></select></label>
-                      <label class="vendor-note-field"><span>Notes</span><textarea bind:value={vendorForm.note} rows="2" placeholder="Package details, next steps, reminders…"></textarea></label>
-                      <div class="vendor-form-actions"><button class="dashboard-primary" type="submit">Save vendor</button><button class="dashboard-secondary" type="button" onclick={() => (showVendorForm = false)}>Cancel</button></div>
-                    </form>
-                  </td></tr>
-                {/if}
-                {#each sortedVendors as vendor (vendor.id)}
+                {#each sortedVendors as vendor, index (vendor.id)}
                   <tr>
                     <td><div class="vendor-name-cell"><input class="bulk-select-checkbox" type="checkbox" checked={selectedVendorIds.includes(vendor.id)} onchange={() => toggleVendorSelection(vendor.id)} aria-label={`Select ${vendor.name}`} /><span class="vendor-name"><strong>{vendor.name}</strong>{#if vendor.website}<a href={vendorWebsiteHref(vendor.website)} target="_blank" rel="noreferrer">{vendor.website}</a>{/if}</span></div></td>
                     <td><span class="vendor-category">{vendor.category}</span></td>
                     <td><span class="vendor-contact"><strong>{vendor.contact || 'No contact name'}</strong>{#if vendor.email}<a href={`mailto:${vendor.email}`}>{vendor.email}</a>{/if}{#if vendor.phone}<a href={`tel:${vendor.phone}`}>{vendor.phone}</a>{/if}</span></td>
                     <td><span class="vendor-budget"><strong>{vendor.cost ? `€${Number(vendor.cost).toLocaleString()}` : 'Not set'}</strong><small>{vendor.deposit ? `€${Number(vendor.deposit).toLocaleString()} deposit` : 'No deposit recorded'}</small></span></td>
-                    <td><select class={`vendor-status vendor-status--${vendor.status}`} value={vendor.status} aria-label={`Status for ${vendor.name}`} onchange={(event) => updateVendor(vendor.id, { status: event.currentTarget.value })}><option value="researching">Researching</option><option value="contacted">Contacted</option><option value="quoted">Quote received</option><option value="booked">Booked</option><option value="paid">Paid</option></select></td>
+                    <td><span class={`vendor-status vendor-status--${vendor.status}`}>{vendor.status === 'quoted' ? 'Quote received' : vendor.status.charAt(0).toUpperCase() + vendor.status.slice(1)}</span></td>
                     <td><span class="vendor-note">{vendor.note || 'No notes'}</span></td>
-                    <td><button class="dashboard-row-remove" type="button" aria-label={`Remove ${vendor.name}`} onclick={() => (vendorToDelete = vendor)}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></td>
+                    <td class="table-row-menu-cell"><div class="guest-action-menu"><button class="guest-menu-trigger" type="button" onclick={() => toggleRowMenu('vendor', vendor.id)} aria-label={`Actions for ${vendor.name}`} aria-haspopup="menu" aria-expanded={openRowMenuKey === `vendor:${vendor.id}`}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="12" cy="19" r="1.6" /></svg></button>{#if openRowMenuKey === `vendor:${vendor.id}`}<div class:opens-up={index >= sortedVendors.length - 2} class="guest-menu-popover" role="menu"><button type="button" role="menuitem" onclick={() => { openRowMenuKey = ''; openVendorEditModal(vendor) }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" /></svg>Edit</button><button class="danger" type="button" role="menuitem" onclick={() => { openRowMenuKey = ''; vendorToDelete = vendor }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg>Delete</button></div>{/if}</div></td>
                   </tr>
                 {:else}
-                  {#if !showVendorForm}<tr class="vendor-empty-row"><td colspan="7"><p>No vendors added yet. Add your first supplier to start tracking plans and costs.</p></td></tr>{/if}
+                  <tr class="vendor-empty-row"><td colspan="7"><p>No vendors added yet. Add your first supplier to start tracking plans and costs.</p></td></tr>
                 {/each}
               </tbody>
             </table>
@@ -2338,6 +2331,112 @@
     </div>
   </main>
 </div>
+
+{#if shareGuestIds.length}
+  <div class="dashboard-modal-backdrop" role="presentation" onclick={(event) => event.target === event.currentTarget && closeGuestShareModal()}>
+    <div class="dashboard-modal guest-share-modal" role="dialog" aria-modal="true" aria-labelledby="guest-share-heading">
+      <button class="dashboard-modal-close" type="button" onclick={closeGuestShareModal} aria-label="Close">×</button>
+      <h2 id="guest-share-heading">Invite guests</h2>
+      <p>Choose how to invite {shareGuestIds.length} selected {shareGuestIds.length === 1 ? 'guest' : 'guests'}.</p>
+      <form onsubmit={simulateGuestShare}>
+        <fieldset class="share-method-grid"><legend>Invite using</legend>{#each [{ value: 'whatsapp', label: 'WhatsApp' }, { value: 'viber', label: 'Viber' }, { value: 'email', label: 'Email' }, { value: 'sms', label: 'SMS' }] as method}<button class:active={shareMethod === method.value} type="button" aria-pressed={shareMethod === method.value} onclick={() => { shareMethod = method.value; shareResult = null }}>{#if method.value === 'whatsapp'}<svg class="service-logo service-logo--whatsapp" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.04 2a9.84 9.84 0 0 0-8.46 14.86L2 22l5.28-1.55A9.86 9.86 0 1 0 12.04 2Zm0 17.92a8 8 0 0 1-4.08-1.12l-.29-.17-3.13.92.93-3.05-.19-.31a7.94 7.94 0 1 1 6.76 3.73Zm4.36-5.96c-.24-.12-1.42-.7-1.64-.78-.22-.08-.38-.12-.54.12-.16.24-.62.78-.76.94-.14.16-.28.18-.52.06-.24-.12-1.01-.37-1.93-1.19-.71-.64-1.19-1.42-1.33-1.66-.14-.24-.02-.37.11-.49.11-.11.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42-.06-.12-.54-1.3-.74-1.78-.2-.47-.4-.4-.54-.41h-.46c-.16 0-.42.06-.64.3-.22.24-.84.82-.84 2s.86 2.32.98 2.48c.12.16 1.69 2.58 4.1 3.62.57.25 1.02.39 1.37.5.58.18 1.1.16 1.51.1.46-.07 1.42-.58 1.62-1.14.2-.56.2-1.04.14-1.14-.06-.1-.22-.16-.46-.28Z" /></svg>{:else if method.value === 'viber'}<svg class="service-logo service-logo--viber" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.7 4.3C17.8 2.4 14.9 2 12 2S6.2 2.4 4.3 4.3 2 8.2 2 11.4c0 3 .4 5.3 2.1 7l-.8 3.4 3.6-1.1c1.5.8 3.2 1.1 5.1 1.1 2.9 0 5.8-.4 7.7-2.3S22 15.6 22 12s-.4-5.8-2.3-7.7Z" /><path class="service-logo-detail" d="M8.2 7.4c.3-.4.8-.5 1.2-.2l1.3 1c.4.3.5.8.2 1.2l-.7.9c.7 1.5 1.8 2.6 3.3 3.3l.9-.7c.4-.3.9-.2 1.2.2l1 1.3c.3.4.2.9-.2 1.2l-.8.7c-.5.4-1.2.6-1.8.4-3.4-1-6.1-3.7-7.1-7.1-.2-.6 0-1.3.4-1.8l.7-.4ZM14.7 7.1c1.2.5 1.9 1.2 2.4 2.4M14.4 4.9c2.5.6 4.1 2.2 4.7 4.7" /></svg>{:else if method.value === 'email'}<svg class="service-logo service-logo--generic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m4 7 8 6 8-6" /></svg>{:else}<svg class="service-logo service-logo--generic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H10l-5 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" /></svg>{/if}{method.label}</button>{/each}</fieldset>
+        <label><span>Message</span><textarea bind:value={shareMessage} rows="6"></textarea></label>
+        <div class="share-link-preview"><span>Website link</span><strong>{data.siteUrl}</strong></div>
+        <p class="share-development-note">Development preview — Send records the invitation method for valid recipients, but no message is actually delivered.</p>
+        {#if shareResult}
+          <div class="share-result" role="status">
+            <strong>{shareResult.sent.length} {shareResult.sent.length === 1 ? 'guest is' : 'guests are'} ready for {shareMethodLabel(shareResult.method)}.</strong>
+            {#if shareResult.failed.length}<p>Could not send to {shareResult.failed.map((guest) => guest.name).join(', ')} because {shareResult.method === 'email' ? 'an email address is missing' : 'a phone number is missing'}.</p>{:else}<p>Every selected guest has the required contact details.</p>{/if}
+          </div>
+        {/if}
+        <button class="dashboard-primary share-send-button" type="submit">Send</button>
+      </form>
+    </div>
+  </div>
+{/if}
+
+{#if showGuestForm}
+  <div class="dashboard-modal-backdrop" role="presentation" onclick={(event) => event.target === event.currentTarget && closeForms()}>
+    <div class="dashboard-modal table-edit-modal" role="dialog" aria-modal="true" aria-labelledby="guest-form-heading">
+      <button class="dashboard-modal-close" type="button" onclick={closeForms} aria-label="Close">×</button>
+      <h2 id="guest-form-heading">{editingGuestId ? 'Edit guest' : 'Add guest'}</h2><p>{editingGuestId ? 'Update all saved details for this guest.' : 'Add a guest and their invitation details.'}</p>
+      <form id="guest-table-form" onsubmit={addGuest}>
+        <label><span>Full name *</span><input bind:value={guestForm.name} required placeholder="Full name" /></label>
+        <div class="dashboard-form-row"><label><span>Email</span><input bind:value={guestForm.email} type="email" placeholder="guest@example.com" /></label><label><span>Phone</span><input bind:value={guestForm.phone} type="tel" placeholder="Phone number" /></label></div>
+        <div class="dashboard-form-row"><label><span>Adults</span><select bind:value={guestForm.adults}>{#each Array(20) as _, index}<option value={index + 1}>{index + 1}</option>{/each}</select></label><label><span>Children</span><select bind:value={guestForm.children}>{#each Array(11) as _, index}<option value={index}>{index}</option>{/each}</select></label></div>
+        <label><span>RSVP</span><select bind:value={guestForm.status}><option value="attending">Attending</option><option value="pending">Pending</option><option value="declined">Declined</option></select></label>
+        <label><span>Dietary or guest note</span><textarea bind:value={guestForm.meal} rows="3" placeholder="Dietary needs, accessibility, reminders…"></textarea></label>
+        <label><span>Private note</span><textarea bind:value={guestForm.note} rows="2" placeholder="Optional internal note"></textarea></label>
+      </form>
+      <div class="table-modal-footer"><button class="dashboard-primary table-modal-save" type="submit" form="guest-table-form">Save</button></div>
+    </div>
+  </div>
+{/if}
+
+{#if showGiftForm}
+  <div class="dashboard-modal-backdrop" role="presentation" onclick={(event) => event.target === event.currentTarget && closeForms()}>
+    <div class="dashboard-modal table-edit-modal" role="dialog" aria-modal="true" aria-labelledby="gift-form-heading">
+      <button class="dashboard-modal-close" type="button" onclick={closeForms} aria-label="Close">×</button>
+      <h2 id="gift-form-heading">{editingGiftId ? 'Edit gift' : 'Add gift'}</h2><p>Record the giver, gift details, notes, and thank-you status.</p>
+      <form id="gift-table-form" onsubmit={addGift}>
+        <label><span>Giver name *</span><input value={giftForm.guest} oninput={(event) => updateGiftGuestName(event.currentTarget.value)} list="gift-guest-options" required placeholder="Type a name or choose a guest" /><datalist id="gift-guest-options">{#each data.guests as guest}<option value={guest.name}></option>{/each}</datalist><small>Type any name, or choose someone from the guest list.</small></label>
+        <div class="dashboard-form-row"><label><span>Gift type</span><select bind:value={giftForm.type}><option value="money">Money</option><option value="item">Item or other</option></select></label><label><span>Thank you</span><select bind:value={giftForm.thanked}><option value={false}>Pending</option><option value={true}>Thanked</option></select></label></div>
+        {#if giftForm.type === 'money'}<div class="dashboard-form-row"><label><span>Currency</span><select bind:value={giftForm.currency}><option value="EUR">€ EUR</option><option value="GBP">£ GBP</option><option value="USD">$ USD</option></select></label><label><span>Amount *</span><input bind:value={giftForm.amount} type="number" min="0" step="0.01" required placeholder="0" /></label></div>{:else}<label><span>Gift *</span><input bind:value={giftForm.gift} required placeholder="What they brought" /></label>{/if}
+        <label><span>Note</span><textarea bind:value={giftForm.note} rows="3" placeholder="Optional note"></textarea></label>
+      </form>
+      <div class="table-modal-footer"><button class="dashboard-primary table-modal-save" type="submit" form="gift-table-form">Save</button></div>
+    </div>
+  </div>
+{/if}
+
+{#if showMusicForm}
+  <div class="dashboard-modal-backdrop" role="presentation" onclick={(event) => event.target === event.currentTarget && closeForms()}>
+    <div class="dashboard-modal table-edit-modal" role="dialog" aria-modal="true" aria-labelledby="music-form-heading">
+      <button class="dashboard-modal-close" type="button" onclick={closeForms} aria-label="Close">×</button>
+      <h2 id="music-form-heading">{editingSongId ? 'Edit music' : 'Add music'}</h2><p>Add a title and an optional Spotify, Apple Music, YouTube Music, or external link.</p>
+      <form id="music-table-form" onsubmit={addSong}>
+        <label><span>Title and artist</span><input bind:value={musicForm.name} oninput={scheduleMusicMetadataLookup} placeholder={musicMetadataLoading ? 'Finding title…' : 'Title and artist'} /></label>
+        <label><span>Music link</span><input bind:value={musicForm.link} oninput={scheduleMusicMetadataLookup} type="text" inputmode="url" aria-invalid={musicLinkError ? 'true' : undefined} placeholder="Optional music link" />{#if musicMetadataLoading}<small>Finding title and artist…</small>{:else if detectedMusicLink}<small class="music-link-detected">✓ {detectedMusicLink.platformLabel} detected</small>{:else if musicForm.link.trim()}<small>Saved as an external link without a player.</small>{/if}{#if musicLinkError}<small class="music-link-error">{musicLinkError}</small>{/if}</label>
+        <label><span>Type</span><select bind:value={musicForm.type}><option value="entrance">Entrance</option><option value="first-dance">First dance</option><option value="parent-dance">Parent dance</option><option value="cake-cutting">Cake cutting</option><option value="party">Party</option><option value="reception">Reception</option><option value="other">Other</option></select></label>
+      </form>
+      <div class="table-modal-footer"><button class="dashboard-primary table-modal-save" type="submit" form="music-table-form" disabled={musicSaving}>{musicSaving ? 'Saving…' : 'Save'}</button></div>
+    </div>
+  </div>
+{/if}
+
+{#if showMessageForm}
+  <div class="dashboard-modal-backdrop" role="presentation" onclick={(event) => event.target === event.currentTarget && closeForms()}>
+    <div class="dashboard-modal table-edit-modal" role="dialog" aria-modal="true" aria-labelledby="message-form-heading">
+      <button class="dashboard-modal-close" type="button" onclick={closeForms} aria-label="Close">×</button>
+      <h2 id="message-form-heading">{editingMessageId ? 'Edit message' : 'Add message'}</h2><p>Edit the sender, contact details, date, message, and read status.</p>
+      <form id="message-table-form" onsubmit={saveMessageEdit}>
+        <label><span>Guest name *</span><input bind:value={messageForm.name} required placeholder="Full name" /></label>
+        <div class="dashboard-form-row"><label><span>Email</span><input bind:value={messageForm.email} type="email" placeholder="guest@example.com" /></label><label><span>Phone</span><input bind:value={messageForm.phone} type="tel" placeholder="Phone number" /></label></div>
+        <div class="dashboard-form-row"><label><span>Date sent</span><input bind:value={messageForm.sentAt} type="datetime-local" /></label><label><span>Status</span><select bind:value={messageForm.read}><option value={false}>Unread</option><option value={true}>Read</option></select></label></div>
+        <label><span>Message *</span><textarea bind:value={messageForm.message} required rows="5" placeholder="Write the message"></textarea></label>
+      </form>
+      <div class="table-modal-footer"><button class="dashboard-primary table-modal-save" type="submit" form="message-table-form">Save</button></div>
+    </div>
+  </div>
+{/if}
+
+{#if showVendorForm}
+  <div class="dashboard-modal-backdrop" role="presentation" onclick={(event) => event.target === event.currentTarget && closeForms()}>
+    <div class="dashboard-modal table-edit-modal table-edit-modal--wide" role="dialog" aria-modal="true" aria-labelledby="vendor-form-heading">
+      <button class="dashboard-modal-close" type="button" onclick={closeForms} aria-label="Close">×</button>
+      <h2 id="vendor-form-heading">{editingVendorId ? 'Edit vendor' : 'Add vendor'}</h2><p>Keep supplier, contact, budget, booking status, and notes together.</p>
+      <form id="vendor-table-form" onsubmit={addVendor}>
+        <div class="dashboard-form-row"><label><span>Vendor or company *</span><input bind:value={vendorForm.name} required placeholder="Company name" /></label><label><span>Category</span><select bind:value={vendorForm.category}><option>Venue</option><option>Catering</option><option>Photography</option><option>Videography</option><option>Flowers</option><option>Music / DJ</option><option>Decor</option><option>Transport</option><option>Entertainment</option><option>Beauty</option><option>Stationery</option><option>Other</option></select></label></div>
+        <div class="dashboard-form-row"><label><span>Contact person</span><input bind:value={vendorForm.contact} placeholder="Full name" /></label><label><span>Status</span><select bind:value={vendorForm.status}><option value="researching">Researching</option><option value="contacted">Contacted</option><option value="quoted">Quote received</option><option value="booked">Booked</option><option value="paid">Paid</option></select></label></div>
+        <div class="dashboard-form-row"><label><span>Email</span><input bind:value={vendorForm.email} type="email" placeholder="hello@example.com" /></label><label><span>Phone</span><input bind:value={vendorForm.phone} type="tel" placeholder="Phone number" /></label></div>
+        <label><span>Website</span><input bind:value={vendorForm.website} type="text" placeholder="example.com" /></label>
+        <div class="dashboard-form-row"><label><span>Estimated cost (€)</span><input bind:value={vendorForm.cost} type="number" min="0" step="0.01" placeholder="0" /></label><label><span>Deposit paid (€)</span><input bind:value={vendorForm.deposit} type="number" min="0" step="0.01" placeholder="0" /></label></div>
+        <label><span>Notes</span><textarea bind:value={vendorForm.note} rows="3" placeholder="Package details, next steps, reminders…"></textarea></label>
+      </form>
+      <div class="table-modal-footer"><button class="dashboard-primary table-modal-save" type="submit" form="vendor-table-form">Save</button></div>
+    </div>
+  </div>
+{/if}
 
 {#if guestToDelete}
   <ConfirmDialog
