@@ -293,9 +293,12 @@
 .table-filter-chips button.active strong { color: #fff; background: var(--dash-accent); }
 .table-info-chip { border-color: #ded8ca; color: #71654d; background: #f8f5ed; cursor: default; }
 .table-info-chip strong { width: auto; color: #5d4d2e; background: #ebe3d3; }
-.table-download-button { display: grid; width: 40px; min-width: 40px; height: 40px; padding: 0; border: 1px solid #ddd9d1; border-radius: 8px; color: #5e5a53; background: #fff; place-items: center; }
+.table-download-button { position: relative; display: grid; width: 40px; min-width: 40px; height: 40px; padding: 0; border: 1px solid #ddd9d1; border-radius: 8px; color: #5e5a53; background: #fff; place-items: center; }
 .table-download-button:hover { border-color: #b8b2a8; color: var(--dash-accent); background: #faf9f6; }
 .table-download-button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
+.table-download-button::after { position: absolute; z-index: 20; top: 50%; right: calc(100% + 8px); padding: 6px 9px; border-radius: 6px; color: #fff; background: #242321; box-shadow: 0 4px 12px rgba(24,22,18,.16); content: 'Download to CSV'; font-size: 12px; font-weight: 650; line-height: 1; opacity: 0; pointer-events: none; transform: translate(4px,-50%); transition: opacity 120ms ease, transform 120ms ease; white-space: nowrap; }
+.table-download-button:hover::after,
+.table-download-button:focus-visible::after { opacity: 1; transform: translate(0,-50%); }
 .table-selected-actions { display: flex; min-height: 40px; padding: 3px 4px 3px 10px; border: 1px solid #ead8d6; border-radius: 8px; background: #fbf4f3; align-items: center; gap: 5px; }
 .table-selected-actions > span { color: #75555a; font-size: 14px; font-weight: 750; white-space: nowrap; }
 

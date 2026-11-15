@@ -93,6 +93,11 @@
     toastTimer = window.setTimeout(() => (toast = ''), 2600)
   }
 
+  function clonePurchasedDraft(site) {
+    if (!site?.draft) return createDraft(site?.occasionId ?? selectedOccasionId, site?.templateId ?? 'classic')
+    return structuredClone($state.snapshot(site.draft))
+  }
+
   function applyLocation() {
     const params = new URLSearchParams(window.location.search)
     const templateId = params.get('editor')
@@ -115,7 +120,7 @@
     if (templateId) {
       const fromDashboard = params.get('source') === 'dashboard' && purchasedSites[0]
       selectedOccasionId = params.get('occasion') ?? selectedOccasionId
-      draft = fromDashboard ? structuredClone(purchasedSites[0].draft) : createDraft(selectedOccasionId, templateId)
+      draft = fromDashboard ? clonePurchasedDraft(purchasedSites[0]) : createDraft(selectedOccasionId, templateId)
       editingPurchased = Boolean(fromDashboard)
       screen = 'editor'
       window.scrollTo({ top: 0 })
@@ -199,7 +204,7 @@
 
   function openPurchasedEditor() {
     if (!currentSite) return
-    draft = structuredClone(currentSite.draft)
+    draft = clonePurchasedDraft(currentSite)
     selectedOccasionId = draft.occasionId
     editingPurchased = true
     screen = 'editor'

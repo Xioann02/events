@@ -51,11 +51,14 @@
   let selectedVendorIds = $state([])
   let openGuestMenuId = $state('')
   let editingGuestId = $state('')
+  let editingGiftId = $state('')
+  let editingSongId = $state('')
+  let editingMessageId = $state('')
+  let editingVendorId = $state('')
   let editingGuestField = $state('')
   let guestEditDirty = $state(false)
   let rsvpFilter = $state('all')
   let giftFilter = $state('all')
-  let musicFilter = $state('all')
   let messageFilter = $state('all')
   let vendorFilter = $state('all')
   let showGuestForm = $state(false)
@@ -93,6 +96,7 @@
   let tableForm = $state({ capacity: 8 })
   let giftForm = $state({ guestId: '', guest: '', type: 'money', amount: '', currency: 'EUR', gift: '', note: '' })
   let musicForm = $state({ name: '', link: '', type: 'other' })
+  let messageForm = $state({ name: '', email: '', phone: '', message: '', read: false })
   let musicLinkError = $state('')
   let musicMetadataLoading = $state(false)
   let musicSaving = $state(false)
@@ -123,7 +127,7 @@
   let allVisibleGuestsSelected = $derived(sortedGuests.length > 0 && visibleSelectedGuestIds.length === sortedGuests.length)
   let someVisibleGuestsSelected = $derived(visibleSelectedGuestIds.length > 0 && !allVisibleGuestsSelected)
   let filteredGifts = $derived(data.gifts.filter((gift) => `${gift.guest} ${giftLabel(gift)} ${gift.note}`.toLowerCase().includes(giftSearch.toLowerCase()) && (giftFilter === 'all' || (giftFilter === 'thanked' ? gift.thanked : !gift.thanked))))
-  let filteredSongs = $derived((data.songs ?? []).filter((song) => `${song.name} ${song.link} ${songTypeLabel(song.type)}`.toLowerCase().includes(musicSearch.toLowerCase()) && (musicFilter === 'all' || song.type === musicFilter)))
+  let filteredSongs = $derived((data.songs ?? []).filter((song) => `${song.name} ${song.link} ${songTypeLabel(song.type)}`.toLowerCase().includes(musicSearch.toLowerCase())))
   let filteredMessages = $derived((data.messages ?? []).filter((message) => `${message.name} ${message.email} ${message.phone} ${message.message}`.toLowerCase().includes(messageSearch.toLowerCase()) && (messageFilter === 'all' || (messageFilter === 'read' ? message.read : !message.read))))
   let filteredVendors = $derived((data.vendors ?? []).filter((vendor) => {
     const matchesSearch = `${vendor.name} ${vendor.category} ${vendor.contact} ${vendor.email} ${vendor.phone} ${vendor.note}`.toLowerCase().includes(vendorSearch.toLowerCase())
@@ -171,6 +175,13 @@
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  function goToWebsiteEditor() {
+    const templateId = site.templateId ?? site.draft?.templateId ?? 'classic'
+    const occasionId = site.occasionId ?? site.draft?.occasionId ?? 'wedding'
+    const params = new URLSearchParams({ editor: templateId, occasion: occasionId, source: 'dashboard' })
+    window.location.assign(`${window.location.pathname}?${params.toString()}`)
+  }
+
   function tableSortValue(item, key) {
     if (key === 'giftValue') return giftLabel(item)
     if (key === 'contact') return `${item.contact ?? ''} ${item.email ?? ''} ${item.phone ?? ''}`
@@ -208,11 +219,18 @@
   function addGuest(event) {
     event.preventDefault()
     if (!guestForm.name.trim()) return
-    const guest = createGuest(guestForm)
-    data = { ...data, guests: [...data.guests, guest] }
+    const adults = Math.max(1, Number(guestForm.adults) || 1)
+    const children = Math.max(0, Number(guestForm.children) || 0)
+    if (editingGuestId) {
+      updateGuest(editingGuestId, { ...guestForm, name: guestForm.name.trim(), adults, children, party: adults + children })
+    } else {
+      const guest = createGuest({ ...guestForm, adults, children })
+      data = { ...data, guests: [...data.guests, guest] }
+    }
     guestForm = { name: '', email: '', phone: '', adults: 1, children: 0, status: 'pending', note: '', meal: '' }
     showGuestForm = false
-    onNotify('Guest added to your list.')
+    onNotify(editingGuestId ? 'Guest changes saved.' : 'Guest added to your list.')
+    editingGuestId = ''
   }
 
   function openGuestRow() {
@@ -225,6 +243,13 @@
   function cancelGuestRow() {
     guestForm = { name: '', email: '', phone: '', adults: 1, children: 0, status: 'pending', note: '', meal: '' }
     showGuestForm = false
+    editingGuestId = ''
+  }
+
+  function openGuestEditModal(guest) {
+    guestForm = { name: guest.name, email: guest.email ?? '', phone: guest.phone ?? '', adults: guest.adults ?? guest.party ?? 1, children: guest.children ?? 0, status: guest.status ?? 'pending', note: guest.note ?? '', meal: guest.meal ?? '' }
+    editingGuestId = guest.id
+    showGuestForm = true
   }
 
   function removeGuest(guestId) {
@@ -920,16 +945,29 @@
     if (!guestName.trim()) return
     if (giftForm.type === 'money' && !String(giftForm.amount).trim()) return
     if (giftForm.type === 'item' && !giftForm.gift.trim()) return
-    data = { ...data, gifts: [createGift({ ...giftForm, guest: guestName }), ...data.gifts] }
+    const values = { ...giftForm, guest: guestName }
+    if (editingGiftId) {
+      data = { ...data, gifts: data.gifts.map((gift) => gift.id === editingGiftId ? { ...gift, ...values } : gift) }
+    } else {
+      data = { ...data, gifts: [createGift(values), ...data.gifts] }
+    }
     giftForm = { guestId: '', guest: '', type: 'money', amount: '', currency: 'EUR', gift: '', note: '' }
     showGiftForm = false
-    onNotify('Gift added.')
+    onNotify(editingGiftId ? 'Gift changes saved.' : 'Gift added.')
+    editingGiftId = ''
   }
 
   function openGiftForm(guest = null) {
+    editingGiftId = ''
     giftForm = { guestId: guest?.id ?? '', guest: guest?.name ?? '', type: 'money', amount: '', currency: 'EUR', gift: '', note: '' }
     showGiftForm = true
     if (guest) navigate('gifts')
+  }
+
+  function openGiftEditModal(gift) {
+    giftForm = { guestId: gift.guestId ?? '', guest: gift.guest ?? '', type: gift.type ?? 'money', amount: gift.amount ?? '', currency: gift.currency ?? 'EUR', gift: gift.gift ?? '', note: gift.note ?? '' }
+    editingGiftId = gift.id
+    showGiftForm = true
   }
 
   function songTypeLabel(type) {
@@ -970,20 +1008,36 @@
     let name = musicForm.name.trim()
     if (!name && music) name = musicMetadataTitle(await fetchMusicMetadata(link))
     name ||= music ? `${music.platformLabel} ${music.kindLabel}` : 'Music link'
-    data = { ...data, songs: [createSong({ ...musicForm, name, platform: music?.platform ?? '', contentType: music?.kind ?? '' }), ...(data.songs ?? [])] }
+    const values = { ...musicForm, name, platform: music?.platform ?? '', contentType: music?.kind ?? '' }
+    if (editingSongId) {
+      data = { ...data, songs: (data.songs ?? []).map((song) => song.id === editingSongId ? { ...song, ...values } : song) }
+    } else {
+      data = { ...data, songs: [createSong(values), ...(data.songs ?? [])] }
+    }
     musicForm = { name: '', link: '', type: 'other' }
     musicLinkError = ''
     musicMetadataLoading = false
     musicSaving = false
     showMusicForm = false
-    onNotify(music ? `${music.kindLabel} added from ${music.platformLabel}.` : 'Music added to your list.')
+    onNotify(editingSongId ? 'Music changes saved.' : (music ? `${music.kindLabel} added from ${music.platformLabel}.` : 'Music added to your list.'))
+    editingSongId = ''
   }
 
   function openMusicForm() {
+    editingSongId = ''
     musicForm = { name: '', link: '', type: 'other' }
     musicLinkError = ''
     musicMetadataLoading = false
     musicSaving = false
+    showMusicForm = true
+  }
+
+  function openMusicEditModal(song) {
+    musicForm = { name: song.name ?? '', link: song.link ?? '', type: song.type ?? 'other' }
+    musicLinkError = ''
+    musicMetadataLoading = false
+    musicSaving = false
+    editingSongId = song.id
     showMusicForm = true
   }
 
@@ -1005,11 +1059,24 @@
   function addVendor(event) {
     event.preventDefault()
     if (!vendorForm.name.trim()) return
-    const vendor = createVendor(vendorForm)
-    data = { ...data, vendors: [...(data.vendors ?? []), vendor] }
+    const vendor = editingVendorId ? { ...vendorForm, name: vendorForm.name.trim() } : createVendor(vendorForm)
+    data = { ...data, vendors: editingVendorId ? (data.vendors ?? []).map((item) => item.id === editingVendorId ? { ...item, ...vendor } : item) : [...(data.vendors ?? []), vendor] }
     vendorForm = { name: '', category: 'Venue', contact: '', email: '', phone: '', website: '', cost: '', deposit: '', status: 'researching', note: '' }
     showVendorForm = false
-    onNotify(`${vendor.name} added to vendors.`)
+    onNotify(editingVendorId ? 'Vendor changes saved.' : `${vendor.name} added to vendors.`)
+    editingVendorId = ''
+  }
+
+  function openVendorForm() {
+    vendorForm = { name: '', category: 'Venue', contact: '', email: '', phone: '', website: '', cost: '', deposit: '', status: 'researching', note: '' }
+    editingVendorId = ''
+    showVendorForm = true
+  }
+
+  function openVendorEditModal(vendor) {
+    vendorForm = { name: vendor.name ?? '', category: vendor.category ?? 'Venue', contact: vendor.contact ?? '', email: vendor.email ?? '', phone: vendor.phone ?? '', website: vendor.website ?? '', cost: vendor.cost ?? '', deposit: vendor.deposit ?? '', status: vendor.status ?? 'researching', note: vendor.note ?? '' }
+    editingVendorId = vendor.id
+    showVendorForm = true
   }
 
   function removeVendor(vendorId) {
@@ -1030,6 +1097,19 @@
 
   function updateMessage(messageId, changes) {
     data = { ...data, messages: (data.messages ?? []).map((message) => message.id === messageId ? { ...message, ...changes } : message) }
+  }
+
+  function openMessageEditModal(message) {
+    messageForm = { name: message.name ?? '', email: message.email ?? '', phone: message.phone ?? '', message: message.message ?? '', read: Boolean(message.read) }
+    editingMessageId = message.id
+  }
+
+  function saveMessageEdit(event) {
+    event.preventDefault()
+    if (!editingMessageId || !messageForm.name.trim() || !messageForm.message.trim()) return
+    updateMessage(editingMessageId, { ...messageForm, name: messageForm.name.trim(), message: messageForm.message.trim() })
+    editingMessageId = ''
+    onNotify('Message changes saved.')
   }
 
   function removeMessage(messageId) {
@@ -1187,6 +1267,11 @@
     showGiftForm = false
     showMusicForm = false
     showVendorForm = false
+    editingGuestId = ''
+    editingGiftId = ''
+    editingSongId = ''
+    editingMessageId = ''
+    editingVendorId = ''
   }
 
   function formatCalendarDate(date) {
@@ -1334,11 +1419,12 @@
     if (!source || !target) return
     const reordered = notes.filter((note) => note.id !== sourceId)
     const targetIndex = reordered.findIndex((note) => note.id === targetId)
-    const card = event.currentTarget
-    const bounds = card.getBoundingClientRect()
-    const grid = card.parentElement
-    const isFullWidth = bounds.width > grid.getBoundingClientRect().width * .75
-    const insertAfter = isFullWidth ? event.clientY > bounds.top + bounds.height / 2 : event.clientX > bounds.left + bounds.width / 2
+    const sourceIndex = notes.findIndex((note) => note.id === sourceId)
+    const originalTargetIndex = notes.findIndex((note) => note.id === targetId)
+    const movingForward = sourceIndex < originalTargetIndex
+    // The whole target card is an active drop zone. Its side is inferred from
+    // the drag direction, so no centre threshold needs to be crossed.
+    const insertAfter = movingForward
     reordered.splice(targetIndex + (insertAfter ? 1 : 0), 0, source)
     updateGeneralNotes(reordered)
     draggedGeneralNoteId = ''
@@ -1651,7 +1737,7 @@
       </div>
       <div class="dashboard-topbar__actions">
         <a href={data.siteUrl} target="_blank" rel="noreferrer">View website <span aria-hidden="true">↗</span></a>
-        <button type="button" onclick={onEditWebsite}>Edit website</button>
+        <button type="button" onclick={goToWebsiteEditor}>Edit website</button>
       </div>
     </header>
 
@@ -1703,7 +1789,7 @@
               <p>{template.name}</p>
               <h2>{data.eventName}</h2>
               <small>{data.siteUrl.replace('https://', '')}</small>
-              <div><button type="button" onclick={onEditWebsite}>Edit website</button><a href={data.siteUrl} target="_blank" rel="noreferrer" aria-label="Open website">↗</a></div>
+              <div><button type="button" onclick={goToWebsiteEditor}>Edit website</button><a href={data.siteUrl} target="_blank" rel="noreferrer" aria-label="Open website">↗</a></div>
             </section>
           </div>
         </section>
@@ -1717,7 +1803,7 @@
 
           <div class="table-topbar">
             <div class="table-topbar-left"><label class="table-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={guestSearch} placeholder="Search guests" aria-label="Search guests or email" /><span>{filteredGuests.length}</span></label>{#if visibleSelectedGuestIds.length > 0}<div class="table-selected-actions"><span>{visibleSelectedGuestIds.length} selected</span><label class="bulk-rsvp-control"><select aria-label="Change RSVP for selected guests" onchange={(event) => updateSelectedGuestStatus(event.currentTarget.value)}><option value="" selected disabled>RSVP</option><option value="attending">Attending</option><option value="pending">Pending</option><option value="declined">Declined</option></select></label><button type="button" class="bulk-delete-button" aria-label="Delete selected guests" title="Delete selected" onclick={() => requestBulkDelete('guests')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div>
-            <div class="table-topbar-right"><div class="table-filter-chips" role="group" aria-label="Filter guests by RSVP"><button class:active={rsvpFilter === 'all'} type="button" onclick={() => (rsvpFilter = 'all')}>All <strong>{summary.total}</strong></button><button class:active={rsvpFilter === 'attending'} type="button" onclick={() => (rsvpFilter = 'attending')}>Attending <strong>{summary.attending}</strong></button><button class:active={rsvpFilter === 'pending'} type="button" onclick={() => (rsvpFilter = 'pending')}>Pending <strong>{summary.pending}</strong></button><button class:active={rsvpFilter === 'declined'} type="button" onclick={() => (rsvpFilter = 'declined')}>Declined <strong>{summary.declined}</strong></button></div><button class="table-download-button" type="button" onclick={downloadGuestCsv} aria-label="Download guest list CSV" title="Download CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div>
+            <div class="table-topbar-right"><div class="table-filter-chips" role="group" aria-label="Filter guests by RSVP"><button class:active={rsvpFilter === 'all'} type="button" onclick={() => (rsvpFilter = 'all')}>All <strong>{summary.total}</strong></button><button class:active={rsvpFilter === 'attending'} type="button" onclick={() => (rsvpFilter = 'attending')}>Attending <strong>{summary.attending}</strong></button><button class:active={rsvpFilter === 'pending'} type="button" onclick={() => (rsvpFilter = 'pending')}>Pending <strong>{summary.pending}</strong></button><button class:active={rsvpFilter === 'declined'} type="button" onclick={() => (rsvpFilter = 'declined')}>Declined <strong>{summary.declined}</strong></button></div><button class="table-download-button" type="button" onclick={downloadGuestCsv} aria-label="Download guest list CSV" title="Download to CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div>
           </div>
 
           <div class="dashboard-table-wrap" role="region" aria-label="Guest list table">
@@ -1951,7 +2037,7 @@
       {:else if active === 'gifts'}
         <section class="dashboard-view" aria-labelledby="gifts-heading">
           <header class="dashboard-page-heading"><div><h1 id="gifts-heading">Gift list</h1><p>Track monetary gifts and meaningful items, linked directly to your guests.</p></div><button class="dashboard-primary" type="button" onclick={() => openGiftForm()}>+ Add gift</button></header>
-          <div class="table-topbar"><div class="table-topbar-left"><label class="table-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={giftSearch} placeholder="Search gifts" aria-label="Search gifts" /><span>{filteredGifts.length}</span></label>{#if visibleSelectedGiftIds.length > 0}<div class="table-selected-actions"><span>{visibleSelectedGiftIds.length} selected</span><button type="button" class="bulk-delete-button" aria-label="Delete selected gifts" title="Delete selected" onclick={() => requestBulkDelete('gifts')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div><div class="table-topbar-right"><div class="table-filter-chips" role="group" aria-label="Filter gifts"><button class:active={giftFilter === 'all'} type="button" onclick={() => (giftFilter = 'all')}>All <strong>{data.gifts.length}</strong></button><button class:active={giftFilter === 'thanked'} type="button" onclick={() => (giftFilter = 'thanked')}>Thanked <strong>{data.gifts.filter((gift) => gift.thanked).length}</strong></button><button class:active={giftFilter === 'pending'} type="button" onclick={() => (giftFilter = 'pending')}>Pending <strong>{data.gifts.filter((gift) => !gift.thanked).length}</strong></button></div><button class="table-download-button" type="button" onclick={downloadGiftCsv} aria-label="Download gift list CSV" title="Download CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></div>
+          <div class="table-topbar"><div class="table-topbar-left"><label class="table-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={giftSearch} placeholder="Search gifts" aria-label="Search gifts" /><span>{filteredGifts.length}</span></label>{#if visibleSelectedGiftIds.length > 0}<div class="table-selected-actions"><span>{visibleSelectedGiftIds.length} selected</span><button type="button" class="bulk-delete-button" aria-label="Delete selected gifts" title="Delete selected" onclick={() => requestBulkDelete('gifts')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div><div class="table-topbar-right"><div class="table-filter-chips" role="group" aria-label="Filter gifts"><button class:active={giftFilter === 'all'} type="button" onclick={() => (giftFilter = 'all')}>All <strong>{data.gifts.length}</strong></button><button class:active={giftFilter === 'thanked'} type="button" onclick={() => (giftFilter = 'thanked')}>Thanked <strong>{data.gifts.filter((gift) => gift.thanked).length}</strong></button><button class:active={giftFilter === 'pending'} type="button" onclick={() => (giftFilter = 'pending')}>Pending <strong>{data.gifts.filter((gift) => !gift.thanked).length}</strong></button></div><button class="table-download-button" type="button" onclick={downloadGiftCsv} aria-label="Download gift list CSV" title="Download to CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></div>
           <div class="dashboard-table-wrap" role="region" aria-label="Gift list table">
             <table class="dashboard-data-table dashboard-gift-table">
               <thead><tr>
@@ -1983,7 +2069,7 @@
         <section class="dashboard-view" aria-labelledby="music-heading">
           <header class="dashboard-page-heading"><div><h1 id="music-heading">Music</h1><p>Add official Spotify, Apple Music, and YouTube Music players for songs and playlists.</p></div><button class="dashboard-primary" type="button" onclick={openMusicForm}>+ Add music</button></header>
 
-          <div class="table-topbar"><div class="table-topbar-left"><label class="table-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={musicSearch} placeholder="Search music" aria-label="Search songs or links" /><span>{filteredSongs.length}</span></label>{#if visibleSelectedSongIds.length > 0}<div class="table-selected-actions"><span>{visibleSelectedSongIds.length} selected</span><button type="button" class="bulk-delete-button" aria-label="Delete selected songs" title="Delete selected" onclick={() => requestBulkDelete('music')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div><div class="table-topbar-right"><div class="table-filter-chips" role="group" aria-label="Filter music by type"><button class:active={musicFilter === 'all'} type="button" onclick={() => (musicFilter = 'all')}>All <strong>{(data.songs ?? []).length}</strong></button><button class:active={musicFilter === 'entrance'} type="button" onclick={() => (musicFilter = 'entrance')}>Entrance <strong>{(data.songs ?? []).filter((song) => song.type === 'entrance').length}</strong></button><button class:active={musicFilter === 'first-dance'} type="button" onclick={() => (musicFilter = 'first-dance')}>First dance <strong>{(data.songs ?? []).filter((song) => song.type === 'first-dance').length}</strong></button><button class:active={musicFilter === 'parent-dance'} type="button" onclick={() => (musicFilter = 'parent-dance')}>Parent dance <strong>{(data.songs ?? []).filter((song) => song.type === 'parent-dance').length}</strong></button><button class:active={musicFilter === 'cake-cutting'} type="button" onclick={() => (musicFilter = 'cake-cutting')}>Cake cutting <strong>{(data.songs ?? []).filter((song) => song.type === 'cake-cutting').length}</strong></button><button class:active={musicFilter === 'party'} type="button" onclick={() => (musicFilter = 'party')}>Party <strong>{(data.songs ?? []).filter((song) => song.type === 'party').length}</strong></button><button class:active={musicFilter === 'reception'} type="button" onclick={() => (musicFilter = 'reception')}>Reception <strong>{(data.songs ?? []).filter((song) => song.type === 'reception').length}</strong></button><button class:active={musicFilter === 'other'} type="button" onclick={() => (musicFilter = 'other')}>Other <strong>{(data.songs ?? []).filter((song) => song.type === 'other').length}</strong></button></div><button class="table-download-button" type="button" onclick={downloadMusicCsv} aria-label="Download music list CSV" title="Download CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></div>
+          <div class="table-topbar"><div class="table-topbar-left"><label class="table-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={musicSearch} placeholder="Search music" aria-label="Search songs or links" /><span>{filteredSongs.length}</span></label>{#if visibleSelectedSongIds.length > 0}<div class="table-selected-actions"><span>{visibleSelectedSongIds.length} selected</span><button type="button" class="bulk-delete-button" aria-label="Delete selected songs" title="Delete selected" onclick={() => requestBulkDelete('music')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div><div class="table-topbar-right"><button class="table-download-button" type="button" onclick={downloadMusicCsv} aria-label="Download music list CSV" title="Download to CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></div>
 
           <div class="dashboard-table-wrap" role="region" aria-label="Music list table">
             <table class="dashboard-data-table dashboard-music-table">
@@ -2022,7 +2108,7 @@
             <div><h1 id="messages-heading">Messages</h1><p>Read the notes your guests leave through your event website.</p></div>
           </header>
 
-          <div class="table-topbar"><div class="table-topbar-left"><label class="table-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={messageSearch} placeholder="Search messages" aria-label="Search messages" /><span>{filteredMessages.length}</span></label>{#if visibleSelectedMessageIds.length > 0}<div class="table-selected-actions"><span>{visibleSelectedMessageIds.length} selected</span><button type="button" class="bulk-delete-button" aria-label="Delete selected messages" title="Delete selected" onclick={() => requestBulkDelete('messages')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div><div class="table-topbar-right"><div class="table-filter-chips" role="group" aria-label="Filter messages"><button class:active={messageFilter === 'all'} type="button" onclick={() => (messageFilter = 'all')}>All <strong>{(data.messages ?? []).length}</strong></button><button class:active={messageFilter === 'unread'} type="button" onclick={() => (messageFilter = 'unread')}>Unread <strong>{(data.messages ?? []).filter((message) => !message.read).length}</strong></button><button class:active={messageFilter === 'read'} type="button" onclick={() => (messageFilter = 'read')}>Read <strong>{(data.messages ?? []).filter((message) => message.read).length}</strong></button></div><button class="table-download-button" type="button" onclick={downloadMessageCsv} aria-label="Download messages CSV" title="Download CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></div>
+          <div class="table-topbar"><div class="table-topbar-left"><label class="table-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={messageSearch} placeholder="Search messages" aria-label="Search messages" /><span>{filteredMessages.length}</span></label>{#if visibleSelectedMessageIds.length > 0}<div class="table-selected-actions"><span>{visibleSelectedMessageIds.length} selected</span><button type="button" class="bulk-delete-button" aria-label="Delete selected messages" title="Delete selected" onclick={() => requestBulkDelete('messages')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div><div class="table-topbar-right"><div class="table-filter-chips" role="group" aria-label="Filter messages"><button class:active={messageFilter === 'all'} type="button" onclick={() => (messageFilter = 'all')}>All <strong>{(data.messages ?? []).length}</strong></button><button class:active={messageFilter === 'unread'} type="button" onclick={() => (messageFilter = 'unread')}>Unread <strong>{(data.messages ?? []).filter((message) => !message.read).length}</strong></button><button class:active={messageFilter === 'read'} type="button" onclick={() => (messageFilter = 'read')}>Read <strong>{(data.messages ?? []).filter((message) => message.read).length}</strong></button></div><button class="table-download-button" type="button" onclick={downloadMessageCsv} aria-label="Download messages CSV" title="Download to CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></div>
 
           <div class="dashboard-table-wrap" role="region" aria-label="Guest messages table">
             <table class="dashboard-data-table dashboard-message-table">
@@ -2059,7 +2145,7 @@
             <button class="dashboard-primary" type="button" onclick={() => (showVendorForm = true)}>+ Add vendor</button>
           </header>
 
-          <div class="table-topbar"><div class="table-topbar-left"><label class="table-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={vendorSearch} placeholder="Search vendors" aria-label="Search vendors" /><span>{filteredVendors.length}</span></label>{#if visibleSelectedVendorIds.length > 0}<div class="table-selected-actions"><span>{visibleSelectedVendorIds.length} selected</span><button type="button" class="bulk-delete-button" aria-label="Delete selected vendors" title="Delete selected" onclick={() => requestBulkDelete('vendors')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div><div class="table-topbar-right"><div class="table-filter-chips" role="group" aria-label="Vendor status and budget"><button class:active={vendorFilter === 'all'} type="button" onclick={() => (vendorFilter = 'all')}>All <strong>{(data.vendors ?? []).length}</strong></button><button class:active={vendorFilter === 'booked'} type="button" onclick={() => (vendorFilter = 'booked')}>Booked <strong>{(data.vendors ?? []).filter((vendor) => ['booked', 'paid'].includes(vendor.status)).length}</strong></button><button class:active={vendorFilter === 'planning'} type="button" onclick={() => (vendorFilter = 'planning')}>Planning <strong>{(data.vendors ?? []).filter((vendor) => !['booked', 'paid'].includes(vendor.status)).length}</strong></button><span class="table-info-chip">Budget <strong>€{(data.vendors ?? []).reduce((total, vendor) => total + (Number(vendor.cost) || 0), 0).toLocaleString()}</strong></span></div><button class="table-download-button" type="button" onclick={downloadVendorCsv} aria-label="Download vendors CSV" title="Download CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></div>
+          <div class="table-topbar"><div class="table-topbar-left"><label class="table-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={vendorSearch} placeholder="Search vendors" aria-label="Search vendors" /><span>{filteredVendors.length}</span></label>{#if visibleSelectedVendorIds.length > 0}<div class="table-selected-actions"><span>{visibleSelectedVendorIds.length} selected</span><button type="button" class="bulk-delete-button" aria-label="Delete selected vendors" title="Delete selected" onclick={() => requestBulkDelete('vendors')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div><div class="table-topbar-right"><div class="table-filter-chips" role="group" aria-label="Vendor status and budget"><button class:active={vendorFilter === 'all'} type="button" onclick={() => (vendorFilter = 'all')}>All <strong>{(data.vendors ?? []).length}</strong></button><button class:active={vendorFilter === 'booked'} type="button" onclick={() => (vendorFilter = 'booked')}>Booked <strong>{(data.vendors ?? []).filter((vendor) => ['booked', 'paid'].includes(vendor.status)).length}</strong></button><button class:active={vendorFilter === 'planning'} type="button" onclick={() => (vendorFilter = 'planning')}>Planning <strong>{(data.vendors ?? []).filter((vendor) => !['booked', 'paid'].includes(vendor.status)).length}</strong></button><span class="table-info-chip">Budget <strong>€{(data.vendors ?? []).reduce((total, vendor) => total + (Number(vendor.cost) || 0), 0).toLocaleString()}</strong></span></div><button class="table-download-button" type="button" onclick={downloadVendorCsv} aria-label="Download vendors CSV" title="Download to CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></div>
 
           <div class="dashboard-table-wrap" role="region" aria-label="Vendor list table">
             <table class="dashboard-data-table dashboard-vendor-table">
@@ -2152,7 +2238,7 @@
               {#if !notesSectionsCollapsed.day}
                 <div id="selected-day-content">
                   <div class="notes-day-events">
-                    <div class="notes-subsection-heading"><h3>Events</h3><button class="dashboard-secondary" type="button" onclick={() => (calendarEventFormOpen = !calendarEventFormOpen)}>{calendarEventFormOpen ? 'Cancel' : '+ Add event'}</button></div>
+                    <div class="notes-subsection-heading"><h3>Events</h3><button class="dashboard-primary" type="button" onclick={() => (calendarEventFormOpen = !calendarEventFormOpen)}>{calendarEventFormOpen ? 'Cancel' : '+ Add event'}</button></div>
                     {#if calendarEventFormOpen}
                       <form class="calendar-event-form" onsubmit={addCalendarEvent}>
                         <label><span>Event</span><input bind:value={calendarEventForm.title} required maxlength="120" placeholder="Event title" /></label>
@@ -2176,7 +2262,7 @@
               <header class="notes-section-header">
                 <div><h2 id="fixed-notes-heading">General notes</h2></div>
                 <div class="general-notes-header-actions">
-                  <button class="dashboard-secondary general-note-add" type="button" onclick={addGeneralNote}>+ Add note</button>
+                  <button class="dashboard-primary general-note-add" type="button" onclick={addGeneralNote}>+ Add note</button>
                   <button class="notes-collapse-button" type="button" aria-expanded={!notesSectionsCollapsed.fixed} aria-label={notesSectionsCollapsed.fixed ? 'Expand general notes' : 'Minimize general notes'} onclick={() => toggleNotesSection('fixed')}>{notesSectionsCollapsed.fixed ? '+' : '−'}</button>
                 </div>
               </header>
@@ -2232,9 +2318,9 @@
 
       {:else if active === 'website'}
         <section class="dashboard-view" aria-labelledby="website-heading">
-          <header class="dashboard-page-heading"><div><p class="dashboard-eyebrow">Your digital invitation</p><h1 id="website-heading">Website settings</h1><p>Edit the invitation your guests see and manage its public link.</p></div><button class="dashboard-primary" type="button" onclick={onEditWebsite}>Edit website</button></header>
+          <header class="dashboard-page-heading"><div><p class="dashboard-eyebrow">Your digital invitation</p><h1 id="website-heading">Website settings</h1><p>Edit the invitation your guests see and manage its public link.</p></div><button class="dashboard-primary" type="button" onclick={goToWebsiteEditor}>Edit website</button></header>
           <div class="website-management-grid">
-            <section class="website-preview-card"><div class={`cart-item__art cart-item__art--${template.id}`}><span>{site.title}</span><i>{site.occasionName}</i></div><div><span><i></i> Published</span><h2>{template.name}</h2><p>Last saved just now</p><button type="button" onclick={onEditWebsite}>Open website editor <span>→</span></button></div></section>
+            <section class="website-preview-card"><div class={`cart-item__art cart-item__art--${template.id}`}><span>{site.title}</span><i>{site.occasionName}</i></div><div><span><i></i> Published</span><h2>{template.name}</h2><p>Last saved just now</p><button type="button" onclick={goToWebsiteEditor}>Open website editor <span>→</span></button></div></section>
             <section class="dashboard-panel website-link-card"><span>Public link</span><h2>Share your invitation</h2><p>Anyone with this link can view the event and send an RSVP.</p><div><input value={data.siteUrl} readonly /><button type="button" onclick={copySiteLink}>{copied ? 'Copied' : 'Copy'}</button></div><small>Connected to your QR code automatically.</small></section>
             <section class="dashboard-panel website-status-card"><span>Publishing</span><div><p><strong>Website status</strong><small>Visible to guests</small></p><button class:active={data.published} type="button" onclick={() => (data = { ...data, published: !data.published })} aria-label="Toggle website visibility" aria-pressed={data.published}><i></i></button></div><div><p><strong>RSVP collection</strong><small>Accept guest responses</small></p><button class="active" type="button" aria-label="RSVP collection enabled" aria-pressed="true"><i></i></button></div></section>
           </div>
