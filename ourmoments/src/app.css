@@ -1038,9 +1038,72 @@ p {
   font-size: max(13px, 0.65rem);
 }
 
-.footer-links a {
+.footer-links a,
+.footer-links button {
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
   text-decoration: none;
 }
+
+.footer-links a:hover,
+.footer-links button:hover { color: #fff; }
+
+.contact-modal-backdrop {
+  position: fixed;
+  z-index: 1200;
+  inset: 0;
+  display: grid;
+  padding: 24px;
+  background: rgba(26, 23, 20, 0.68);
+  backdrop-filter: blur(10px);
+  place-items: center;
+  animation: backdrop-in 180ms ease both;
+}
+
+.contact-modal {
+  position: relative;
+  width: min(560px, 100%);
+  max-height: calc(100vh - 48px);
+  padding: 42px;
+  overflow-y: auto;
+  border-radius: 20px;
+  background: var(--paper);
+  box-shadow: 0 40px 120px rgba(22, 17, 14, 0.4);
+  animation: modal-in 300ms var(--ease) both;
+}
+
+.contact-modal__close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  place-items: center;
+  font-size: max(13px, 1.35rem);
+  line-height: 1;
+}
+
+.contact-modal__close:hover { background: var(--paper-deep); }
+.contact-modal h2 { margin-top: 13px; font-family: var(--display); font-size: clamp(2.4rem, 7vw, 4rem); font-weight: 400; letter-spacing: -.045em; line-height: .95; }
+.contact-modal__intro { max-width: 440px; margin-top: 15px; color: var(--muted); line-height: 1.6; }
+.contact-modal form { display: grid; margin-top: 27px; gap: 17px; }
+.contact-modal label { display: grid; gap: 7px; }
+.contact-modal label > span { font-size: max(13px, .68rem); font-weight: 700; }
+.contact-modal input,
+.contact-modal textarea { width: 100%; padding: 12px 13px; border: 1px solid var(--line-strong); border-radius: 9px; outline: 0; color: var(--ink); background: #fff; }
+.contact-modal input { min-height: 46px; }
+.contact-modal textarea { min-height: 145px; line-height: 1.5; resize: vertical; }
+.contact-modal input:focus,
+.contact-modal textarea:focus { border-color: var(--ink); box-shadow: 0 0 0 3px rgba(39,35,31,.08); }
+.contact-modal__submit { width: 100%; margin-top: 3px; justify-content: center; }
+.contact-modal > small { display: block; margin-top: 14px; color: var(--muted); font-size: max(12px, .58rem); text-align: center; }
 
 .toast {
   position: fixed;
@@ -2436,6 +2499,9 @@ p {
 }
 
 @media (max-width: 760px) {
+  .contact-modal-backdrop { padding: 12px; }
+  .contact-modal { max-height: calc(100vh - 24px); padding: 38px 22px 26px; border-radius: 16px; }
+
   .site-header {
     min-height: 70px;
     padding-inline: 18px;

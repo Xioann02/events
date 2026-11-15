@@ -4,6 +4,7 @@
   import ExactTemplateFrame from './ExactTemplateFrame.svelte'
   import HeroFeatureScene from './HeroFeatureScene.svelte'
   import PlansPage from './PlansPage.svelte'
+  import ContactModal from './ContactModal.svelte'
 
   const websiteFeatures = [
     { title: 'Event information', detail: 'Keep every date, time and venue detail together.' },
@@ -33,6 +34,7 @@
 
   let selectedOccasion = $derived(getOccasion(selectedOccasionId))
   let templateTrack
+  let contactOpen = $state(false)
 
   function scrollToTemplates() {
     document.getElementById('templates')?.scrollIntoView({ behavior: 'smooth' })
@@ -250,5 +252,7 @@
     <span>ourmoments<span>.io</span></span>
   </div>
   <p>Beautifully simple invitations for the days worth remembering.</p>
-  <div class="footer-links"><a href="#templates">Templates</a><a href="#plans">Plans</a><span>© 2026</span></div>
+  <div class="footer-links"><a href="#templates">Templates</a><a href="#plans">Plans</a><button type="button" onclick={() => (contactOpen = true)}>CONTACT</button><span>© 2026</span></div>
 </footer>
+
+{#if contactOpen}<ContactModal onClose={() => (contactOpen = false)} />{/if}
