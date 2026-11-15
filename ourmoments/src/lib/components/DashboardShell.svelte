@@ -75,7 +75,11 @@
   let seatCapacityWarning = $state(null)
   let seatCapacityWarningTimer
   let seatGuestSearch = $state('')
+  let messageRecipientPickerOpen = $state(false)
+  let messageRecipientSearch = $state('')
   let showGiftForm = $state(false)
+  let giftGuestPickerOpen = $state(false)
+  let giftGuestSearch = $state('')
   let showMusicForm = $state(false)
   let showMessageForm = $state(false)
   let showVendorForm = $state(false)
@@ -109,7 +113,8 @@
   let tableForm = $state({ capacity: 8 })
   let giftForm = $state({ guestId: '', guest: '', type: 'money', amount: '', currency: 'EUR', gift: '', note: '', thanked: false })
   let musicForm = $state({ name: '', link: '', type: 'other' })
-  let messageForm = $state({ name: '', email: '', phone: '', message: '', read: false, sentAt: '' })
+  let messageForm = $state({ guestId: '', recipientIds: [], manualRecipients: [], name: '', email: '', phone: '', message: '', read: true, sentAt: '', direction: 'sent', channel: 'email' })
+  let messageFormError = $state('')
   let musicLinkError = $state('')
   let musicMetadataLoading = $state(false)
   let musicSaving = $state(false)
@@ -140,8 +145,16 @@
   let allVisibleGuestsSelected = $derived(sortedGuests.length > 0 && visibleSelectedGuestIds.length === sortedGuests.length)
   let someVisibleGuestsSelected = $derived(visibleSelectedGuestIds.length > 0 && !allVisibleGuestsSelected)
   let filteredGifts = $derived(data.gifts.filter((gift) => `${gift.guest} ${giftLabel(gift)} ${gift.note}`.toLowerCase().includes(giftSearch.toLowerCase()) && (giftFilter === 'all' || (giftFilter === 'thanked' ? gift.thanked : !gift.thanked))))
+  let giftGuestResults = $derived(data.guests.filter((guest) => `${guest.name} ${guest.email ?? ''} ${guest.phone ?? ''}`.toLowerCase().includes(giftGuestSearch.toLowerCase())))
   let filteredSongs = $derived((data.songs ?? []).filter((song) => `${song.name} ${song.link} ${songTypeLabel(song.type)}`.toLowerCase().includes(musicSearch.toLowerCase())))
-  let filteredMessages = $derived((data.messages ?? []).filter((message) => `${message.name} ${message.email} ${message.phone} ${message.message}`.toLowerCase().includes(messageSearch.toLowerCase()) && (messageFilter === 'all' || (messageFilter === 'read' ? message.read : !message.read))))
+  let filteredMessages = $derived((data.messages ?? []).filter((message) => {
+    const direction = message.direction ?? 'received'
+    const matchesSearch = `${message.name} ${message.email} ${message.phone} ${message.message} ${direction} ${messageChannelLabel(message.channel ?? 'website')}`.toLowerCase().includes(messageSearch.toLowerCase())
+    const matchesFilter = messageFilter === 'all'
+      || messageFilter === direction
+      || (messageFilter === 'unread' && direction === 'received' && !message.read)
+    return matchesSearch && matchesFilter
+  }))
   let filteredVendors = $derived((data.vendors ?? []).filter((vendor) => {
     const matchesSearch = `${vendor.name} ${vendor.category} ${vendor.contact} ${vendor.email} ${vendor.phone} ${vendor.note}`.toLowerCase().includes(vendorSearch.toLowerCase())
     const booked = ['booked', 'paid'].includes(vendor.status)
@@ -156,6 +169,7 @@
   let visibleSelectedMessageIds = $derived(filteredMessages.filter((message) => selectedMessageIds.includes(message.id)).map((message) => message.id))
   let allMessagesSelected = $derived(filteredMessages.length > 0 && visibleSelectedMessageIds.length === filteredMessages.length)
   let someMessagesSelected = $derived(visibleSelectedMessageIds.length > 0 && !allMessagesSelected)
+  let messageRecipientResults = $derived(data.guests.filter((guest) => `${guest.name} ${guest.email ?? ''} ${guest.phone ?? ''}`.toLowerCase().includes(messageRecipientSearch.toLowerCase())))
   let visibleSelectedVendorIds = $derived(filteredVendors.filter((vendor) => selectedVendorIds.includes(vendor.id)).map((vendor) => vendor.id))
   let allVendorsSelected = $derived(filteredVendors.length > 0 && visibleSelectedVendorIds.length === filteredVendors.length)
   let someVendorsSelected = $derived(visibleSelectedVendorIds.length > 0 && !allVendorsSelected)
@@ -200,6 +214,7 @@
     if (key === 'contact') return `${item.contact ?? ''} ${item.email ?? ''} ${item.phone ?? ''}`
     if (key === 'cost') return Number(item.cost) || 0
     if (key === 'sentAt') return new Date(item.sentAt).getTime() || 0
+    if (key === 'direction') return item.direction ?? 'received'
     return item[key] ?? ''
   }
 
@@ -310,6 +325,7 @@
   function closeGuestShareModal() {
     shareGuestIds = []
     shareResult = null
+    messageFormError = ''
   }
 
   function simulateGuestShare(event) {
@@ -1035,6 +1051,17 @@
     if (guest) navigate('gifts')
   }
 
+  function openGiftGuestPicker() {
+    giftGuestSearch = ''
+    giftGuestPickerOpen = true
+  }
+
+  function selectGiftGuest(guest) {
+    giftForm.guestId = guest.id
+    giftForm.guest = guest.name
+    giftGuestPickerOpen = false
+  }
+
   function openGiftEditModal(gift) {
     giftForm = { guestId: gift.guestId ?? '', guest: gift.guest ?? '', type: gift.type ?? 'money', amount: gift.amount ?? '', currency: gift.currency ?? 'EUR', gift: gift.gift ?? '', note: gift.note ?? '', thanked: Boolean(gift.thanked) }
     editingGiftId = gift.id
@@ -1176,30 +1203,132 @@
     data = { ...data, messages: (data.messages ?? []).map((message) => message.id === messageId ? { ...message, ...changes } : message) }
   }
 
+  function messageDirection(message) {
+    return message.direction ?? 'received'
+  }
+
+  function messageChannelLabel(channel) {
+    return ({ website: 'Website', email: 'Email', whatsapp: 'WhatsApp', viber: 'Viber' })[channel] ?? 'Website'
+  }
+
+  function toggleMessageRecipient(guestId) {
+    messageForm.recipientIds = messageForm.recipientIds.includes(guestId)
+      ? messageForm.recipientIds.filter((id) => id !== guestId)
+      : [...messageForm.recipientIds, guestId]
+    messageFormError = ''
+  }
+
+  function openMessageRecipientPicker() {
+    messageRecipientSearch = ''
+    messageRecipientPickerOpen = true
+  }
+
+  function selectAllMessageRecipientResults() {
+    const resultIds = messageRecipientResults.map((guest) => guest.id)
+    const allSelected = resultIds.length > 0 && resultIds.every((id) => messageForm.recipientIds.includes(id))
+    messageForm.recipientIds = allSelected
+      ? messageForm.recipientIds.filter((id) => !resultIds.includes(id))
+      : [...new Set([...messageForm.recipientIds, ...resultIds])]
+  }
+
+  function addManualMessageRecipient() {
+    messageForm.manualRecipients = [...messageForm.manualRecipients, {
+      id: `manual-recipient-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`,
+      name: '',
+      email: '',
+      phone: '',
+    }]
+    messageFormError = ''
+  }
+
+  function updateManualMessageRecipient(recipientId, changes) {
+    messageForm.manualRecipients = messageForm.manualRecipients.map((recipient) => recipient.id === recipientId ? { ...recipient, ...changes } : recipient)
+    messageFormError = ''
+  }
+
+  function removeManualMessageRecipient(recipientId) {
+    messageForm.manualRecipients = messageForm.manualRecipients.filter((recipient) => recipient.id !== recipientId)
+    messageFormError = ''
+  }
+
   function openMessageEditModal(message) {
-    messageForm = { name: message.name ?? '', email: message.email ?? '', phone: message.phone ?? '', message: message.message ?? '', read: Boolean(message.read), sentAt: toDateTimeLocal(message.sentAt) }
+    messageForm = { guestId: message.guestId ?? '', recipientIds: [], manualRecipients: [], name: message.name ?? '', email: message.email ?? '', phone: message.phone ?? '', message: message.message ?? '', read: Boolean(message.read), sentAt: toDateTimeLocal(message.sentAt), direction: messageDirection(message), channel: message.channel ?? 'website' }
+    messageFormError = ''
     editingMessageId = message.id
     showMessageForm = true
   }
 
   function saveMessageEdit(event) {
     event.preventDefault()
-    if (!messageForm.name.trim() || !messageForm.message.trim()) return
+    messageFormError = ''
+    if (!messageForm.message.trim()) {
+      messageFormError = 'Write a message before sending.'
+      return
+    }
+    if (!editingMessageId && messageForm.direction === 'sent') {
+      const selectedGuests = data.guests.filter((guest) => messageForm.recipientIds.includes(guest.id))
+      const manualRecipients = messageForm.manualRecipients.map((recipient) => ({ ...recipient, manual: true, name: recipient.name.trim(), email: recipient.email.trim(), phone: recipient.phone.trim() }))
+      if (manualRecipients.some((recipient) => !recipient.name)) {
+        messageFormError = 'Add a name for every manual contact.'
+        return
+      }
+      const recipients = [...selectedGuests, ...manualRecipients]
+      if (!recipients.length) {
+        messageFormError = 'Select at least one guest or add a contact manually.'
+        return
+      }
+      const needsEmail = messageForm.channel === 'email'
+      const missing = recipients.filter((recipient) => needsEmail ? !recipient.email?.trim() : !recipient.phone?.trim())
+      if (missing.length) {
+        messageFormError = `${missing.map((recipient) => recipient.name).join(', ')} ${missing.length === 1 ? 'is' : 'are'} missing ${needsEmail ? 'an email address' : 'a phone number'}.`
+        return
+      }
+      const sentAt = new Date().toISOString()
+      const messages = recipients.map((recipient) => ({
+        id: `message-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`,
+        guestId: recipient.manual ? '' : recipient.id,
+        name: recipient.name,
+        email: recipient.email?.trim() ?? '',
+        phone: recipient.phone?.trim() ?? '',
+        message: messageForm.message.trim(),
+        read: true,
+        sentAt,
+        direction: 'sent',
+        channel: messageForm.channel,
+      }))
+      data = { ...data, messages: [...messages, ...(data.messages ?? [])] }
+      showMessageForm = false
+      onNotify(`${messages.length} ${messages.length === 1 ? 'message' : 'messages'} recorded as sent via ${messageChannelLabel(messageForm.channel)}. Development preview only.`)
+      return
+    }
+    if (!messageForm.name.trim()) {
+      messageFormError = 'Add a recipient name.'
+      return
+    }
+    if (messageForm.direction === 'sent' && messageForm.channel === 'email' && !messageForm.email.trim()) {
+      messageFormError = 'Add an email address for this recipient.'
+      return
+    }
+    if (messageForm.direction === 'sent' && ['whatsapp', 'viber'].includes(messageForm.channel) && !messageForm.phone.trim()) {
+      messageFormError = `Add a phone number to send via ${messageChannelLabel(messageForm.channel)}.`
+      return
+    }
     const wasEditing = Boolean(editingMessageId)
-    const values = { ...messageForm, name: messageForm.name.trim(), message: messageForm.message.trim(), sentAt: messageForm.sentAt ? new Date(messageForm.sentAt).toISOString() : new Date().toISOString() }
+    const values = { ...messageForm, name: messageForm.name.trim(), email: messageForm.email.trim(), phone: messageForm.phone.trim(), message: messageForm.message.trim(), sentAt: messageForm.sentAt ? new Date(messageForm.sentAt).toISOString() : new Date().toISOString() }
     if (editingMessageId) {
       updateMessage(editingMessageId, values)
     } else {
-      const message = { id: `message-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`, guestId: '', ...values }
+      const message = { id: `message-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`, ...values }
       data = { ...data, messages: [message, ...(data.messages ?? [])] }
     }
     showMessageForm = false
     editingMessageId = ''
-    onNotify(wasEditing ? 'Message changes saved.' : 'Message added.')
+    onNotify(wasEditing ? 'Message changes saved.' : `Message recorded as sent via ${messageChannelLabel(values.channel)}. Development preview only.`)
   }
 
   function openMessageForm() {
-    messageForm = { name: '', email: '', phone: '', message: '', read: false, sentAt: toDateTimeLocal(new Date().toISOString()) }
+    messageForm = { guestId: '', recipientIds: [], manualRecipients: [], name: '', email: '', phone: '', message: '', read: true, sentAt: toDateTimeLocal(new Date().toISOString()), direction: 'sent', channel: 'email' }
+    messageFormError = ''
     editingMessageId = ''
     showMessageForm = true
   }
@@ -1272,7 +1401,16 @@
   }
 
   function downloadMessageCsv() {
-    downloadCsv('guest-messages.csv', ['Guest', 'Date sent', 'Email', 'Phone', 'Message', 'Status'], sortedMessages.map((message) => [message.name, formatMessageDate(message.sentAt), message.email, message.phone, message.message, message.read ? 'Read' : 'Unread']))
+    downloadCsv('guest-messages.csv', ['Guest', 'Date', 'Direction', 'Channel', 'Email', 'Phone', 'Message', 'Status'], sortedMessages.map((message) => [
+      message.name,
+      formatMessageDate(message.sentAt),
+      messageDirection(message) === 'sent' ? 'Sent' : 'Received',
+      messageChannelLabel(message.channel ?? 'website'),
+      message.email,
+      message.phone,
+      message.message,
+      messageDirection(message) === 'sent' ? 'Sent' : (message.read ? 'Read' : 'Unread'),
+    ]))
   }
 
   function downloadMusicCsv() {
@@ -1366,11 +1504,14 @@
     showGuestForm = false
     showTableForm = false
     showGiftForm = false
+    giftGuestPickerOpen = false
     showMusicForm = false
     showMessageForm = false
     showVendorForm = false
     shareGuestIds = []
     shareResult = null
+    messageFormError = ''
+    messageRecipientPickerOpen = false
     editingGuestId = ''
     editingGiftId = ''
     editingSongId = ''
@@ -2212,17 +2353,18 @@
       {:else if active === 'messages'}
         <section class="dashboard-view" aria-labelledby="messages-heading">
           <header class="dashboard-page-heading">
-            <div><h1 id="messages-heading">Messages</h1><p>Read the notes your guests leave through your event website.</p></div>
-            <button class="dashboard-primary" type="button" onclick={openMessageForm}>+ Add message</button>
+            <div><h1 id="messages-heading">Messages</h1><p>Keep website replies and messages sent to guests together.</p></div>
+            <button class="dashboard-primary" type="button" onclick={openMessageForm}>Send message</button>
           </header>
 
-          <div class="table-topbar"><div class="table-topbar-left"><label class="table-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={messageSearch} placeholder="Search messages" aria-label="Search messages" /><span>{filteredMessages.length}</span></label>{#if visibleSelectedMessageIds.length > 0}<div class="table-selected-actions"><span>{visibleSelectedMessageIds.length} selected</span><button type="button" class="bulk-delete-button" aria-label="Delete selected messages" title="Delete selected" onclick={() => requestBulkDelete('messages')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div><div class="table-topbar-right"><div class="table-filter-chips" role="group" aria-label="Filter messages"><button class:active={messageFilter === 'all'} type="button" onclick={() => (messageFilter = 'all')}>All <strong>{(data.messages ?? []).length}</strong></button><button class:active={messageFilter === 'unread'} type="button" onclick={() => (messageFilter = 'unread')}>Unread <strong>{(data.messages ?? []).filter((message) => !message.read).length}</strong></button><button class:active={messageFilter === 'read'} type="button" onclick={() => (messageFilter = 'read')}>Read <strong>{(data.messages ?? []).filter((message) => message.read).length}</strong></button></div><button class="table-download-button" type="button" onclick={downloadMessageCsv} aria-label="Download messages CSV" title="Download to CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></div>
+          <div class="table-topbar"><div class="table-topbar-left"><label class="table-search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={messageSearch} placeholder="Search messages" aria-label="Search messages" /><span>{filteredMessages.length}</span></label>{#if visibleSelectedMessageIds.length > 0}<div class="table-selected-actions"><span>{visibleSelectedMessageIds.length} selected</span><button type="button" class="bulk-delete-button" aria-label="Delete selected messages" title="Delete selected" onclick={() => requestBulkDelete('messages')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg></button></div>{/if}</div><div class="table-topbar-right"><div class="table-filter-chips" role="group" aria-label="Filter messages"><button class:active={messageFilter === 'all'} type="button" onclick={() => (messageFilter = 'all')}>All <strong>{(data.messages ?? []).length}</strong></button><button class:active={messageFilter === 'received'} type="button" onclick={() => (messageFilter = 'received')}>Received <strong>{(data.messages ?? []).filter((message) => messageDirection(message) === 'received').length}</strong></button><button class:active={messageFilter === 'sent'} type="button" onclick={() => (messageFilter = 'sent')}>Sent <strong>{(data.messages ?? []).filter((message) => messageDirection(message) === 'sent').length}</strong></button><button class:active={messageFilter === 'unread'} type="button" onclick={() => (messageFilter = 'unread')}>Unread <strong>{(data.messages ?? []).filter((message) => messageDirection(message) === 'received' && !message.read).length}</strong></button></div><button class="table-download-button" type="button" onclick={downloadMessageCsv} aria-label="Download messages CSV" title="Download to CSV"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 18v3h14v-3" /></svg></button></div></div>
 
           <div class="dashboard-table-wrap" role="region" aria-label="Guest messages table">
             <table class="dashboard-data-table dashboard-message-table">
               <thead><tr>
                 <th aria-sort={messageSort.key === 'name' ? (messageSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><div class="bulk-header-cell"><input class="bulk-select-checkbox" use:setIndeterminate={someMessagesSelected} type="checkbox" checked={allMessagesSelected} onchange={(event) => selectAllMessages(event.currentTarget.checked)} aria-label="Select all messages" /><button class="guest-sort-button" class:sorted={messageSort.key === 'name'} type="button" onclick={() => toggleTableSort('messages', 'name')}>Guest <span aria-hidden="true">{sortArrow(messageSort, 'name')}</span></button></div></th>
-                <th aria-sort={messageSort.key === 'sentAt' ? (messageSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={messageSort.key === 'sentAt'} type="button" onclick={() => toggleTableSort('messages', 'sentAt')}>Date sent <span aria-hidden="true">{sortArrow(messageSort, 'sentAt')}</span></button></th>
+                <th aria-sort={messageSort.key === 'sentAt' ? (messageSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={messageSort.key === 'sentAt'} type="button" onclick={() => toggleTableSort('messages', 'sentAt')}>Date <span aria-hidden="true">{sortArrow(messageSort, 'sentAt')}</span></button></th>
+                <th aria-sort={messageSort.key === 'direction' ? (messageSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={messageSort.key === 'direction'} type="button" onclick={() => toggleTableSort('messages', 'direction')}>Direction <span aria-hidden="true">{sortArrow(messageSort, 'direction')}</span></button></th>
                 <th aria-sort={messageSort.key === 'contact' ? (messageSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={messageSort.key === 'contact'} type="button" onclick={() => toggleTableSort('messages', 'contact')}>Contact details <span aria-hidden="true">{sortArrow(messageSort, 'contact')}</span></button></th>
                 <th aria-sort={messageSort.key === 'message' ? (messageSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={messageSort.key === 'message'} type="button" onclick={() => toggleTableSort('messages', 'message')}>Message <span aria-hidden="true">{sortArrow(messageSort, 'message')}</span></button></th>
                 <th aria-sort={messageSort.key === 'read' ? (messageSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}><button class="guest-sort-button" class:sorted={messageSort.key === 'read'} type="button" onclick={() => toggleTableSort('messages', 'read')}>Status <span aria-hidden="true">{sortArrow(messageSort, 'read')}</span></button></th>
@@ -2230,16 +2372,17 @@
               </tr></thead>
               <tbody>
                 {#each sortedMessages as message, index (message.id)}
-                  <tr class:unread={!message.read}>
-                    <td><input class="bulk-select-checkbox" type="checkbox" checked={selectedMessageIds.includes(message.id)} onchange={() => toggleMessageSelection(message.id)} aria-label={`Select message from ${message.name}`} /><i class={avatarTone(message.guestId || message.name)}>{message.name.slice(0, 1)}</i><span><strong>{message.name}</strong><small>{message.guestId ? 'Guest list' : 'Website visitor'}</small></span></td>
+                  <tr class:unread={messageDirection(message) === 'received' && !message.read}>
+                    <td><input class="bulk-select-checkbox" type="checkbox" checked={selectedMessageIds.includes(message.id)} onchange={() => toggleMessageSelection(message.id)} aria-label={`Select message for ${message.name}`} /><i class={avatarTone(message.guestId || message.name)}>{message.name.slice(0, 1)}</i><span><strong>{message.name}</strong><small>{message.guestId ? 'Guest list' : messageDirection(message) === 'sent' ? 'Manual contact' : 'Website visitor'}</small></span></td>
                     <td><time datetime={message.sentAt}>{formatMessageDate(message.sentAt)}</time></td>
+                    <td><span class={`message-direction message-direction--${messageDirection(message)}`}><strong>{messageDirection(message) === 'sent' ? 'Sent' : 'Received'}</strong><small>{messageDirection(message) === 'sent' ? 'via' : 'from'} {messageChannelLabel(message.channel ?? 'website')}</small></span></td>
                     <td><span class="message-contact">{#if message.email}<a href={`mailto:${message.email}`}>{message.email}</a>{/if}{#if message.phone}<a href={`tel:${message.phone}`}>{message.phone}</a>{/if}{#if !message.email && !message.phone}<small>No contact details</small>{/if}</span></td>
                     <td><p class="message-copy">{message.message}</p></td>
-                    <td><span class:active={message.read} class="message-read-toggle"><i>{message.read ? '✓' : ''}</i>{message.read ? 'Read' : 'Unread'}</span></td>
+                    <td>{#if messageDirection(message) === 'sent'}<span class="message-delivery-status"><i>✓</i>Sent</span>{:else}<span class:active={message.read} class="message-read-toggle"><i>{message.read ? '✓' : ''}</i>{message.read ? 'Read' : 'Unread'}</span>{/if}</td>
                     <td class="table-row-menu-cell"><div class="guest-action-menu"><button class="guest-menu-trigger" type="button" onclick={() => toggleRowMenu('message', message.id)} aria-label={`Actions for message from ${message.name}`} aria-haspopup="menu" aria-expanded={openRowMenuKey === `message:${message.id}`}><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="12" cy="19" r="1.6" /></svg></button>{#if openRowMenuKey === `message:${message.id}`}<div class:opens-up={index >= sortedMessages.length - 2} class="guest-menu-popover" role="menu"><button type="button" role="menuitem" onclick={() => { openRowMenuKey = ''; openMessageEditModal(message) }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4" /></svg>Edit</button><button class="danger" type="button" role="menuitem" onclick={() => { openRowMenuKey = ''; removeMessage(message.id) }}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg>Delete</button></div>{/if}</div></td>
                   </tr>
                 {:else}
-                  <tr class="message-empty-row"><td colspan="6"><p>No guest messages yet. Messages submitted through your website will appear here.</p></td></tr>
+                  <tr class="message-empty-row"><td colspan="7"><p>No messages yet. Website replies and messages sent to guests will appear here.</p></td></tr>
                 {/each}
               </tbody>
             </table>
@@ -2478,12 +2621,37 @@
       <button class="dashboard-modal-close" type="button" onclick={closeForms} aria-label="Close">×</button>
       <h2 id="gift-form-heading">{editingGiftId ? 'Edit gift' : 'Add gift'}</h2><p>Record the giver, gift details, notes, and thank-you status.</p>
       <form id="gift-table-form" onsubmit={addGift}>
-        <label><span>Giver name *</span><input value={giftForm.guest} oninput={(event) => updateGiftGuestName(event.currentTarget.value)} list="gift-guest-options" required placeholder="Type a name or choose a guest" /><datalist id="gift-guest-options">{#each data.guests as guest}<option value={guest.name}></option>{/each}</datalist><small>Type any name, or choose someone from the guest list.</small></label>
+        <div class="gift-guest-field"><span>Giver</span><button class="message-recipient-open" type="button" onclick={openGiftGuestPicker}><span><strong>{giftForm.guestId ? giftForm.guest : 'Choose a guest'}</strong><small>{giftForm.guestId ? 'Linked to your guest list' : 'Search your guest list'}</small></span><b aria-hidden="true">›</b></button></div>
+        <div class="gift-guest-divider"><span>or enter a name manually</span></div>
+        <label><span>Giver name *</span><input value={giftForm.guest} oninput={(event) => updateGiftGuestName(event.currentTarget.value)} required placeholder="Full name" /><small>{giftForm.guestId ? 'Editing the name will unlink this gift from the selected guest.' : 'This name does not need to be in your guest list.'}</small></label>
         <div class="dashboard-form-row"><label><span>Gift type</span><select bind:value={giftForm.type}><option value="money">Money</option><option value="item">Item or other</option></select></label><label><span>Thank you</span><select bind:value={giftForm.thanked}><option value={false}>Pending</option><option value={true}>Thanked</option></select></label></div>
         {#if giftForm.type === 'money'}<div class="dashboard-form-row"><label><span>Currency</span><select bind:value={giftForm.currency}><option value="EUR">€ EUR</option><option value="GBP">£ GBP</option><option value="USD">$ USD</option></select></label><label><span>Amount *</span><input bind:value={giftForm.amount} type="number" min="0" step="0.01" required placeholder="0" /></label></div>{:else}<label><span>Gift *</span><input bind:value={giftForm.gift} required placeholder="What they brought" /></label>{/if}
         <label><span>Note</span><textarea bind:value={giftForm.note} rows="3" placeholder="Optional note"></textarea></label>
       </form>
       <div class="table-modal-footer"><button class="dashboard-primary table-modal-save" type="submit" form="gift-table-form">Save</button></div>
+    </div>
+  </div>
+{/if}
+
+{#if giftGuestPickerOpen}
+  <div class="dashboard-modal-backdrop gift-guest-picker-backdrop" role="presentation" onclick={(event) => event.target === event.currentTarget && (giftGuestPickerOpen = false)}>
+    <div class="dashboard-modal seat-picker-dialog gift-guest-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="gift-guest-picker-heading">
+      <button class="dashboard-modal-close" type="button" onclick={() => (giftGuestPickerOpen = false)} aria-label="Close guest picker">×</button>
+      <span>Add gift</span>
+      <h2 id="gift-guest-picker-heading">Choose a guest</h2>
+      <p>Search your guest list and choose the giver.</p>
+      <label class="seat-picker-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={giftGuestSearch} type="search" placeholder="Search guests or contact details" aria-label="Search gift giver" /><span>{giftGuestResults.length}</span></label>
+      <div class="seat-picker-list gift-guest-results">
+        {#each giftGuestResults as guest (guest.id)}
+          <button class:current={giftForm.guestId === guest.id} type="button" onclick={() => selectGiftGuest(guest)}>
+            <i class={avatarTone(guest.id || guest.name)}>{guest.name.slice(0, 1)}</i>
+            <span><strong>{guest.name}</strong><small>{guest.email || guest.phone || 'No contact details'}</small></span>
+            <b>{giftForm.guestId === guest.id ? 'Selected' : 'Choose'}</b>
+          </button>
+        {:else}
+          <p class="seat-picker-empty">No guests match your search.</p>
+        {/each}
+      </div>
     </div>
   </div>
 {/if}
@@ -2505,16 +2673,64 @@
 
 {#if showMessageForm}
   <div class="dashboard-modal-backdrop" role="presentation" onclick={(event) => event.target === event.currentTarget && closeForms()}>
-    <div class="dashboard-modal table-edit-modal" role="dialog" aria-modal="true" aria-labelledby="message-form-heading">
+    <div class="dashboard-modal table-edit-modal message-compose-modal" role="dialog" aria-modal="true" aria-labelledby="message-form-heading">
       <button class="dashboard-modal-close" type="button" onclick={closeForms} aria-label="Close">×</button>
-      <h2 id="message-form-heading">{editingMessageId ? 'Edit message' : 'Add message'}</h2><p>Edit the sender, contact details, date, message, and read status.</p>
+      <h2 id="message-form-heading">{editingMessageId ? `Edit ${messageForm.direction === 'sent' ? 'sent' : 'received'} message` : 'Send message'}</h2><p>{messageForm.direction === 'sent' ? 'Choose a guest or enter contact details, then select how to reach them.' : 'Edit the website message and its read status.'}</p>
       <form id="message-table-form" onsubmit={saveMessageEdit}>
-        <label><span>Guest name *</span><input bind:value={messageForm.name} required placeholder="Full name" /></label>
-        <div class="dashboard-form-row"><label><span>Email</span><input bind:value={messageForm.email} type="email" placeholder="guest@example.com" /></label><label><span>Phone</span><input bind:value={messageForm.phone} type="tel" placeholder="Phone number" /></label></div>
-        <div class="dashboard-form-row"><label><span>Date sent</span><input bind:value={messageForm.sentAt} type="datetime-local" /></label><label><span>Status</span><select bind:value={messageForm.read}><option value={false}>Unread</option><option value={true}>Read</option></select></label></div>
+        {#if messageForm.direction === 'sent'}
+          <fieldset class="message-channel-grid"><legend>Send using</legend>{#each [{ value: 'email', label: 'Email' }, { value: 'whatsapp', label: 'WhatsApp' }, { value: 'viber', label: 'Viber' }] as channel}<button class:active={messageForm.channel === channel.value} type="button" aria-pressed={messageForm.channel === channel.value} onclick={() => { messageForm.channel = channel.value; messageFormError = '' }}>{channel.label}</button>{/each}</fieldset>
+          {#if !editingMessageId}
+            <div class="message-recipient-field">
+              <span>Recipients</span>
+              <button class="message-recipient-open" type="button" onclick={openMessageRecipientPicker}><span><strong>{messageForm.recipientIds.length ? `${messageForm.recipientIds.length} ${messageForm.recipientIds.length === 1 ? 'guest' : 'guests'} selected` : 'Choose guests'}</strong><small>Search and select from your guest list</small></span><b aria-hidden="true">›</b></button>
+              {#if messageForm.recipientIds.length}<div class="message-recipient-chips">{#each data.guests.filter((guest) => messageForm.recipientIds.includes(guest.id)) as guest}<span>{guest.name}<button type="button" onclick={() => toggleMessageRecipient(guest.id)} aria-label={`Remove ${guest.name}`}>×</button></span>{/each}</div>{/if}
+              {#if messageForm.manualRecipients.length}<div class="message-manual-recipient-list">{#each messageForm.manualRecipients as recipient, index (recipient.id)}<div class="message-manual-recipient"><header><strong>Manual contact {index + 1}</strong><button type="button" onclick={() => removeManualMessageRecipient(recipient.id)} aria-label={`Remove manual contact ${index + 1}`}>×</button></header><label><span>Name *</span><input value={recipient.name} oninput={(event) => updateManualMessageRecipient(recipient.id, { name: event.currentTarget.value })} required placeholder="Full name" /></label>{#if messageForm.channel === 'email'}<label><span>Email address *</span><input value={recipient.email} oninput={(event) => updateManualMessageRecipient(recipient.id, { email: event.currentTarget.value })} type="email" required placeholder="guest@example.com" /></label>{:else}<label><span>Phone number *</span><input value={recipient.phone} oninput={(event) => updateManualMessageRecipient(recipient.id, { phone: event.currentTarget.value })} type="tel" required placeholder="Phone number with country code" /></label>{/if}</div>{/each}</div>{/if}
+              <button class="message-manual-contact-toggle" type="button" onclick={addManualMessageRecipient}>+ Add contact manually</button>
+            </div>
+          {/if}
+          {#if editingMessageId}
+            <label><span>Recipient name *</span><input bind:value={messageForm.name} required placeholder="Full name" /></label>
+            {#if messageForm.channel === 'email'}
+              <label><span>Email address *</span><input bind:value={messageForm.email} type="email" required placeholder="guest@example.com" /></label>
+            {:else}
+              <label><span>Phone number *</span><input bind:value={messageForm.phone} type="tel" required placeholder="Phone number with country code" /></label>
+            {/if}
+          {/if}
+        {:else}
+          <label><span>Guest name *</span><input bind:value={messageForm.name} required placeholder="Full name" /></label>
+          <div class="dashboard-form-row"><label><span>Email</span><input bind:value={messageForm.email} type="email" placeholder="guest@example.com" /></label><label><span>Phone</span><input bind:value={messageForm.phone} type="tel" placeholder="Phone number" /></label></div>
+          <div class="dashboard-form-row"><label><span>Date received</span><input bind:value={messageForm.sentAt} type="datetime-local" /></label><label><span>Status</span><select bind:value={messageForm.read}><option value={false}>Unread</option><option value={true}>Read</option></select></label></div>
+        {/if}
         <label><span>Message *</span><textarea bind:value={messageForm.message} required rows="5" placeholder="Write the message"></textarea></label>
+        {#if messageFormError}<p class="message-form-error" role="alert">{messageFormError}</p>{/if}
+        {#if messageForm.direction === 'sent'}<p class="share-development-note">Development preview — the message will be recorded as sent, but no external message is delivered.</p>{/if}
       </form>
-      <div class="table-modal-footer"><button class="dashboard-primary table-modal-save" type="submit" form="message-table-form">Save</button></div>
+      <div class="table-modal-footer"><button class="dashboard-primary table-modal-save" type="submit" form="message-table-form">{editingMessageId ? 'Save' : 'Send message'}</button></div>
+    </div>
+  </div>
+{/if}
+
+{#if messageRecipientPickerOpen}
+  <div class="dashboard-modal-backdrop message-recipient-picker-backdrop" role="presentation" onclick={(event) => event.target === event.currentTarget && (messageRecipientPickerOpen = false)}>
+    <div class="dashboard-modal seat-picker-dialog message-recipient-dialog" role="dialog" aria-modal="true" aria-labelledby="message-recipient-heading">
+      <button class="dashboard-modal-close" type="button" onclick={() => (messageRecipientPickerOpen = false)} aria-label="Close recipient picker">×</button>
+      <span>Send message</span>
+      <h2 id="message-recipient-heading">Choose guests</h2>
+      <p>Select as many recipients as you need.</p>
+      <label class="seat-picker-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></svg><input bind:value={messageRecipientSearch} type="search" placeholder="Search guests or contact details" aria-label="Search message recipients" /><span>{messageRecipientResults.length}</span></label>
+      <div class="message-recipient-picker-toolbar"><span>{messageForm.recipientIds.length} selected</span><button type="button" onclick={selectAllMessageRecipientResults}>{messageRecipientResults.length > 0 && messageRecipientResults.every((guest) => messageForm.recipientIds.includes(guest.id)) ? 'Clear results' : 'Select all results'}</button></div>
+      <div class="seat-picker-list message-recipient-results">
+        {#each messageRecipientResults as guest (guest.id)}
+          <button class:current={messageForm.recipientIds.includes(guest.id)} type="button" aria-pressed={messageForm.recipientIds.includes(guest.id)} onclick={() => toggleMessageRecipient(guest.id)}>
+            <i class={avatarTone(guest.id || guest.name)}>{guest.name.slice(0, 1)}</i>
+            <span><strong>{guest.name}</strong><small>{messageForm.channel === 'email' ? (guest.email || 'No email address') : (guest.phone || 'No phone number')}</small></span>
+            <b>{messageForm.recipientIds.includes(guest.id) ? '✓' : ''}</b>
+          </button>
+        {:else}
+          <p class="seat-picker-empty">No guests match your search.</p>
+        {/each}
+      </div>
+      <div class="table-modal-footer"><button class="dashboard-primary table-modal-save" type="button" onclick={() => (messageRecipientPickerOpen = false)}>Done · {messageForm.recipientIds.length} selected</button></div>
     </div>
   </div>
 {/if}
