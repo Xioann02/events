@@ -1,6 +1,7 @@
 <script>
-  import { tick } from 'svelte'
+  import { onMount, tick } from 'svelte'
   import { formatEventDate, getTemplate } from '../catalog.js'
+  import { getDashboardCountdown } from '../dashboard-countdown.js'
   import { createGift, createGuest, createSong, createTable, createVendor, dashboardSummary } from '../dashboard-data.js'
   import { fetchMusicMetadata, musicFallbackUrl, parseMusicLink } from '../music-embeds.js'
   import couplePhoto from '../../assets/modern-couple.jpg'
@@ -121,9 +122,11 @@
   let openMusicPlayerId = $state('')
   let musicMetadataTimer
   let vendorForm = $state({ name: '', category: 'Venue', contact: '', email: '', phone: '', website: '', cost: '', deposit: '', status: 'researching', note: '' })
+  let countdownNow = $state(Date.now())
 
   let summary = $derived(dashboardSummary(data))
   let template = $derived(getTemplate(site.templateId))
+  let eventCountdown = $derived(getDashboardCountdown(site.date, site.draft?.time, countdownNow))
   let selectedFloorShape = $derived((data.floorPlan?.shapes ?? []).find((shape) => shape.id === selectedFloorShapeId))
   let floorTableShape = $derived(data.floorPlan?.tableShape === 'rectangle' ? 'rectangle' : 'round')
   let calendarDays = $derived.by(() => {
@@ -195,6 +198,11 @@
   let sortedMessages = $derived(sortTableRows(filteredMessages, messageSort))
   let sortedVendors = $derived(sortTableRows(filteredVendors, vendorSort))
   let unassignedGuests = $derived(data.guests.filter((guest) => guest.status === 'attending' && !guest.tableId))
+
+  onMount(() => {
+    const countdownTimer = window.setInterval(() => (countdownNow = Date.now()), 1000)
+    return () => window.clearInterval(countdownTimer)
+  })
 
   function navigate(section) {
     active = section
@@ -1698,11 +1706,6 @@
     if (activeGeneralNoteId === noteId) activeGeneralNoteId = ''
   }
 
-  function generalNoteAutoFullWidth(noteId) {
-    const halfWidthNotes = generalNotesData().filter((note) => !note.fullWidth)
-    return halfWidthNotes.length % 2 === 1 && halfWidthNotes.at(-1)?.id === noteId
-  }
-
   function startGeneralNoteDrag(event, noteId) {
     draggedGeneralNoteId = noteId
     dragOverGeneralNoteId = ''
@@ -2065,6 +2068,16 @@
               <p class="dashboard-eyebrow">Welcome back, {account.firstName}🤍</p>
               <h1 id="dashboard-heading">Your celebration,<br /><em>beautifully organised.</em></h1>
             </div>
+            {#if eventCountdown}
+              <aside class:complete={eventCountdown.complete} class="dashboard-countdown" aria-label={`${eventCountdown.label}: ${eventCountdown.values.map((item) => `${item.value} ${item.label}`).join(', ')}`}>
+                <p>{eventCountdown.label}</p>
+                <div>
+                  {#each eventCountdown.values as item, index}
+                    <span><strong>{index === 0 ? item.value : String(item.value).padStart(2, '0')}</strong><small>{item.label}</small></span>
+                  {/each}
+                </div>
+              </aside>
+            {/if}
           </header>
 
           <div class="dashboard-metrics">
@@ -2504,7 +2517,7 @@
               {#if !notesSectionsCollapsed.fixed}
                 <div class="general-notes-list" role="list">
                   {#each generalNotesData() as note (note.id)}
-                    <article role="listitem" class:editing={activeGeneralNoteId === note.id} class:full-width={note.fullWidth || generalNoteAutoFullWidth(note.id)} class:dragging={draggedGeneralNoteId === note.id} class:drag-over={dragOverGeneralNoteId === note.id && draggedGeneralNoteId !== note.id} class={`general-note-card general-note-card--${note.color || 'yellow'}`} onfocusin={(event) => { if (!event.target.matches?.('input[type="checkbox"], .general-note-drag-handle, .general-note-width-toggle, .general-note-remove, .general-note-background-picker button')) activeGeneralNoteId = note.id }} ondragover={(event) => { if (draggedGeneralNoteId && draggedGeneralNoteId !== note.id) { event.preventDefault(); dragOverGeneralNoteId = note.id } }} ondrop={(event) => dropGeneralNote(event, note.id)}>
+                    <article role="listitem" class:editing={activeGeneralNoteId === note.id} class:full-width={note.fullWidth} class:dragging={draggedGeneralNoteId === note.id} class:drag-over={dragOverGeneralNoteId === note.id && draggedGeneralNoteId !== note.id} class={`general-note-card general-note-card--${note.color || 'yellow'}`} onfocusin={(event) => { if (!event.target.matches?.('input[type="checkbox"], .general-note-drag-handle, .general-note-width-toggle, .general-note-remove, .general-note-background-picker button')) activeGeneralNoteId = note.id }} ondragover={(event) => { if (draggedGeneralNoteId && draggedGeneralNoteId !== note.id) { event.preventDefault(); dragOverGeneralNoteId = note.id } }} ondrop={(event) => dropGeneralNote(event, note.id)}>
                       <div class="general-note-topline">
                         {#if activeGeneralNoteId === note.id}
                           <input id={`general-note-title-${note.id}`} class="general-note-title" value={note.title} oninput={(event) => updateGeneralNote(note.id, { title: event.currentTarget.value })} maxlength="100" aria-label="Note title" placeholder="Note title" />

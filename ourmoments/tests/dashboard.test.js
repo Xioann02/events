@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createDashboardData, createGift, createGuest, createSong, createTable, dashboardSummary } from '../src/lib/dashboard-data.js'
+import { getDashboardCountdown, getEventTimestamp } from '../src/lib/dashboard-countdown.js'
 import { fetchMusicMetadata, parseMusicLink } from '../src/lib/music-embeds.js'
 
 test('dashboard seed data is tied to the purchased website', () => {
@@ -22,6 +23,23 @@ test('guest and RSVP summary uses party size', () => {
   ]
 
   assert.deepEqual(dashboardSummary({ guests }), { total: 6, attending: 2, pending: 3, declined: 1 })
+})
+
+test('overview countdown uses the event date and time', () => {
+  const eventTime = getEventTimestamp('2030-06-15', '17:30')
+  const now = eventTime - (((2 * 24 + 3) * 60 * 60 + 4 * 60 + 5) * 1000)
+
+  assert.deepEqual(getDashboardCountdown('2030-06-15', '17:30', now), {
+    complete: false,
+    label: 'Until the celebration',
+    values: [
+      { label: 'Days', value: 2 },
+      { label: 'Hrs', value: 3 },
+      { label: 'Min', value: 4 },
+      { label: 'Sec', value: 5 },
+    ],
+  })
+  assert.equal(getDashboardCountdown('', '17:30', now), null)
 })
 
 test('dashboard creators normalise form values', () => {
