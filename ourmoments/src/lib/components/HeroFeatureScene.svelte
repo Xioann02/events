@@ -386,6 +386,7 @@
       camera.aspect = width / height
       camera.position.z = width < 520 ? 10.4 : 8.5
       scene.position.x = width < 760 ? 0 : 2.1
+      scene.position.y = 0.25
       camera.updateProjectionMatrix()
     })
     observer.observe(canvas.parentElement)

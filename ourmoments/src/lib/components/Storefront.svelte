@@ -23,6 +23,10 @@
     { title: 'Attendance', detail: 'See attending, declined and pending replies at a glance.' },
     { title: 'Gifts', detail: 'Keep gift details organised in one place.' },
     { title: 'Photos', detail: 'Review and manage guest uploads from your dashboard.' },
+    { title: 'Vendors', detail: 'Keep supplier contacts, services and details close at hand.' },
+    { title: 'Messages', detail: 'Send updates and keep guest conversations together.' },
+    { title: 'Music', detail: 'Organise the soundtrack for every moment of your event.' },
+    { title: 'Notes & calendar', detail: 'Capture ideas and keep important dates on schedule.' },
   ]
 
   let {
@@ -85,7 +89,6 @@
         <div class="hero-actions">
           <button class="button button--dark button--large" type="button" onclick={scrollToTemplates}>
             Explore templates
-            <span aria-hidden="true">↘</span>
           </button>
         </div>
       </div>

@@ -15,7 +15,7 @@
     {#each plans as plan}
       <article class:plan-card--featured={plan.featured} class="plan-card">
         <div class="plan-card__topline">
-          {#if plan.featured}<span class="plan-card__mark">Multi-event</span>{:else}<span class="plan-card__mark-spacer" aria-hidden="true"></span>{/if}
+          {#if plan.badge}<span class="plan-card__mark">{plan.badge}</span>{:else}<span class="plan-card__mark-spacer" aria-hidden="true"></span>{/if}
         </div>
         <h2>{plan.name}</h2>
         <p class="plan-card__description">{plan.description}</p>
@@ -23,11 +23,26 @@
         <button class="button button--dark button--large" type="button" onclick={() => onBuyPlan(plan.id)}>
           Choose {plan.name}<span aria-hidden="true">↗</span>
         </button>
-        <ul>
-          {#each plan.features as feature}
-            <li><span aria-hidden="true">+</span>{feature}</li>
-          {/each}
-        </ul>
+        <div class="plan-card__features">
+          {#if plan.featureGroups}
+            {#each plan.featureGroups as group}
+              <section class="plan-card__feature-group" aria-labelledby={`${plan.id}-${group.id}-heading`}>
+                <h3 id={`${plan.id}-${group.id}-heading`}>{group.title}</h3>
+                <ul>
+                  {#each group.features as feature}
+                    <li><span aria-hidden="true">+</span>{feature}</li>
+                  {/each}
+                </ul>
+              </section>
+            {/each}
+          {:else}
+            <ul>
+              {#each plan.features as feature}
+                <li><span aria-hidden="true">+</span>{feature}</li>
+              {/each}
+            </ul>
+          {/if}
+        </div>
       </article>
     {/each}
   </div>
@@ -75,9 +90,9 @@
 
   .plans-grid {
     display: grid;
-    width: min(940px, 100%);
+    width: min(1240px, 100%);
     margin: 0 auto;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     align-items: stretch;
     gap: 18px;
   }
@@ -166,13 +181,43 @@
     justify-content: space-between;
   }
 
+  .plan-card__features {
+    display: grid;
+    padding: 17px 0 0;
+    margin: 18px 0 0;
+    border-top: 1px solid var(--line);
+    gap: 17px;
+  }
+
+  .plan-card__feature-group {
+    display: grid;
+    gap: 10px;
+  }
+
+  .plan-card__feature-group + .plan-card__feature-group {
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+  }
+
+  .plan-card__feature-group h3 {
+    color: var(--ink);
+    font-size: max(14px, 0.76rem);
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
   .plan-card ul {
     display: grid;
-    padding: 19px 0 0;
-    margin: 20px 0 0;
-    border-top: 1px solid var(--line);
-    gap: 14px;
+    margin: 0;
+    padding: 0;
+    grid-template-columns: 1fr;
+    gap: 9px;
     list-style: none;
+  }
+
+  .plan-card__features > ul {
+    grid-template-columns: 1fr;
   }
 
   .plan-card li {
@@ -195,6 +240,12 @@
     text-align: center;
   }
 
+  @media (max-width: 980px) {
+    .plans-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
   @media (max-width: 680px) {
     .plans-page {
       margin-top: 34px;
@@ -215,4 +266,5 @@
       min-height: 0;
     }
   }
+
 </style>

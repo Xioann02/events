@@ -1,28 +1,54 @@
+const essentialWebsiteHighlights = [
+  'A beautiful invitation website',
+  'RSVPs, countdown, maps and FAQs',
+  'Easy sharing on every device',
+]
+
+const websiteHighlights = [
+  'A beautiful invitation website',
+  'RSVPs, countdown, maps and FAQs',
+  'Easy sharing, QR guest photo uploads and multiple languages',
+]
+
+const guestManagementHighlights = [
+  'Guest lists, attendance and seating',
+  'Vendors, gifts and shared photos',
+  'Messages, music, notes and calendar',
+]
+
 export const plans = [
   {
-    id: 'essential',
-    name: 'Standard',
-    price: 150,
-    description: 'Everything you need to bring one event together in one beautiful place.',
-    features: [
-      'One invitation website',
-      'Choose from the full template collection',
-      'Edit event details, schedule and FAQs',
-      'Private planning dashboard',
+    id: 'website',
+    name: 'Essential',
+    price: 85,
+    description: 'A polished event website with the core tools your guests need.',
+    featureGroups: [
+      { id: 'website', title: 'Event website', features: essentialWebsiteHighlights },
     ],
+    features: essentialWebsiteHighlights,
+  },
+  {
+    id: 'essential',
+    name: 'Complete',
+    price: 150,
+    description: 'Your full event website and private guest-management workspace.',
+    featureGroups: [
+      { id: 'website', title: 'Event website', features: websiteHighlights },
+      { id: 'guest-management', title: 'Guest management', features: guestManagementHighlights },
+    ],
+    features: [...websiteHighlights, ...guestManagementHighlights],
+    badge: 'Most popular',
+    featured: true,
   },
   {
     id: 'celebration',
-    name: 'Plus',
-    price: 200,
-    description: 'More room for the details, people and moments around your celebration.',
+    name: 'Multi-event',
+    price: 300,
+    description: 'Everything in Complete for celebrations with more than one event moment.',
     features: [
-      'Everything in Standard',
-      'Multiple event moments in one plan',
-      'Guest and seating organisation',
-      'Photo and gift tracking tools',
+      'Everything in Complete',
+      'Up to 5 events in one plan',
     ],
-    featured: true,
   },
 ]
 
