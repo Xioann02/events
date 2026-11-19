@@ -56,14 +56,6 @@
 
 <a class="skip-link" href="#main-content">Skip to content</a>
 
-<aside class="edition-bar" aria-label="Site edition">
-  <div class="edition-bar__inner">
-    <span>Guest management · Digital Invitations</span>
-    <span>Edition No. 01 / 2026</span>
-    <span>Designed for every gathering</span>
-  </div>
-</aside>
-
 <header class="site-header">
   <a class="brand" href="#top" aria-label="ourmoments.io home">
     <LogoMark />
